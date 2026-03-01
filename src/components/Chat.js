@@ -135,7 +135,11 @@ function GenerateImageCard({ chart }) {
   const [error, setError] = React.useState(null);
 
   React.useEffect(() => {
+    console.log('[GenerateImageCard] Component mounted/updated');
+    console.log('[GenerateImageCard] Chart data:', chart);
+    
     const generateImage = async () => {
+      console.log('[GenerateImageCard] ====== STARTING IMAGE GENERATION ======');
       try {
         setLoading(true);
         setError(null);
@@ -143,8 +147,9 @@ function GenerateImageCard({ chart }) {
         const fullUrl = `${apiUrl}/api/generate-image`;
         
         console.log('[GenerateImage] Making request to:', fullUrl);
-        console.log('[GenerateImage] Prompt:', chart.prompt);
-        console.log('[GenerateImage] REACT_APP_API_URL:', apiUrl);
+        console.log('[GenerateImage] Prompt:', chart?.prompt);
+        console.log('[GenerateImage] Style:', chart?.style);
+        console.log('[GenerateImage] REACT_APP_API_URL:', apiUrl || '(empty - using proxy)');
         
         const response = await fetch(fullUrl, {
           method: 'POST',
