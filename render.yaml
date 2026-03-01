@@ -13,6 +13,8 @@ services:
     envVars:
       - key: MONGODB_URI
         sync: false   # set manually in the Render dashboard
+      - key: HUGGINGFACE_API_TOKEN
+        sync: false   # optional: for higher rate limits on image generation
 
   # ── Frontend: React static site ────────────────────────────────────────────
   - type: static
