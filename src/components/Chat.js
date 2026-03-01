@@ -431,8 +431,16 @@ export default function Chat({ username, firstName, lastName, onLogout }) {
           const userMsg = { id: `u-${Date.now()}`, role: 'user', content: announcementText, timestamp: new Date().toISOString(), jsonFile: jsonFiles[0].name };
           setMessages((m) => [...m, userMsg]);
           return;
+        } else {
+          // JSON is valid but doesn't match YouTube channel format
+          const errorMsg = { id: `e-${Date.now()}`, role: 'assistant', content: `⚠️ The JSON file "${jsonFiles[0].name}" was loaded, but it doesn't appear to be YouTube channel data. Expected fields: "videos" and "channel_name".`, timestamp: new Date().toISOString() };
+          setMessages((m) => [...m, errorMsg]);
         }
-      } catch { /* not valid JSON, ignore */ }
+      } catch (err) {
+        // Invalid JSON
+        const errorMsg = { id: `e-${Date.now()}`, role: 'assistant', content: `❌ Failed to parse JSON file "${jsonFiles[0].name}": ${err.message}`, timestamp: new Date().toISOString() };
+        setMessages((m) => [...m, errorMsg]);
+      }
     }
 
     if (csvFiles.length > 0) {
@@ -483,8 +491,16 @@ export default function Chat({ username, firstName, lastName, onLogout }) {
           const userMsg = { id: `u-${Date.now()}`, role: 'user', content: announcementText, timestamp: new Date().toISOString(), jsonFile: jsonFiles[0].name };
           setMessages((m) => [...m, userMsg]);
           return;
+        } else {
+          // JSON is valid but doesn't match YouTube channel format
+          const errorMsg = { id: `e-${Date.now()}`, role: 'assistant', content: `⚠️ The JSON file "${jsonFiles[0].name}" was loaded, but it doesn't appear to be YouTube channel data. Expected fields: "videos" and "channel_name".`, timestamp: new Date().toISOString() };
+          setMessages((m) => [...m, errorMsg]);
         }
-      } catch { /* not valid JSON, ignore */ }
+      } catch (err) {
+        // Invalid JSON
+        const errorMsg = { id: `e-${Date.now()}`, role: 'assistant', content: `❌ Failed to parse JSON file "${jsonFiles[0].name}": ${err.message}`, timestamp: new Date().toISOString() };
+        setMessages((m) => [...m, errorMsg]);
+      }
     }
 
     if (csvFiles.length > 0) {
@@ -971,7 +987,7 @@ ${sessionSummary}${slimCsvBlock}
           <div ref={bottomRef} />
         </div>
 
-        {dragOver && <div className="chat-drop-overlay">Drop CSV or images here</div>}
+        {dragOver && <div className="chat-drop-overlay">Drop CSV, JSON, or images here</div>}
 
         {/* ── Input area ── */}
         <div className="chat-input-area">
@@ -1003,7 +1019,7 @@ ${sessionSummary}${slimCsvBlock}
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*,.csv,text/csv"
+            accept="image/*,.csv,text/csv,.json,application/json"
             multiple
             style={{ display: 'none' }}
             onChange={handleFileSelect}
@@ -1015,7 +1031,7 @@ ${sessionSummary}${slimCsvBlock}
               className="attach-btn"
               onClick={() => fileInputRef.current?.click()}
               disabled={streaming}
-              title="Attach image or CSV"
+              title="Attach image, CSV, or JSON"
             >
               📎
             </button>
