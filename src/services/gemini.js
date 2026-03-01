@@ -4,12 +4,11 @@ import { CSV_TOOL_DECLARATIONS, YOUTUBE_TOOL_DECLARATIONS } from './csvTools';
 const genAI = new GoogleGenerativeAI(process.env.REACT_APP_GEMINI_API_KEY || '');
 
 // Model name for Gemini API
-// The v1beta API doesn't support gemini-pro or gemini-1.5-flash
-// Try using the model ID format that works with the SDK version
-// Based on @google/generative-ai v0.24.1, try these in order:
-const MODEL = 'gemini-1.5-flash-latest';  // Try this first
-// If that fails, the API key might not have access to newer models
-// Fallback options: 'gemini-1.5-pro-latest', 'models/gemini-1.5-flash'
+// CRITICAL: The SDK v0.24.1 uses v1beta API which has limited model support
+// The error says to "Call ListModels" - models available in v1beta might be different
+// Try the most basic model name format without suffixes
+// If this still fails, the API key may not have access to v1beta models
+const MODEL = 'gemini-1.5-flash';  // Basic name without -latest suffix
 
 const SEARCH_TOOL = { googleSearch: {} };
 const CODE_EXEC_TOOL = { codeExecution: {} };
