@@ -4,10 +4,11 @@ import { CSV_TOOL_DECLARATIONS, YOUTUBE_TOOL_DECLARATIONS } from './csvTools';
 const genAI = new GoogleGenerativeAI(process.env.REACT_APP_GEMINI_API_KEY || '');
 
 // Model name for Gemini API v1beta
-// The error shows gemini-1.5-flash returns 404 for v1beta
-// Trying models/gemini-1.5-flash format or gemini-1.5-pro
-// If this doesn't work, the API key may not have access to these models
-const MODEL = 'models/gemini-1.5-flash';
+// The error shows gemini-1.5-flash returns 404 for v1beta API
+// The API key is valid (length 39), but model not found
+// Trying gemini-1.5-pro which might be available in v1beta
+// If this still fails, the API key may not have access to v1beta models
+const MODEL = 'gemini-1.5-pro';
 
 const SEARCH_TOOL = { googleSearch: {} };
 const CODE_EXEC_TOOL = { codeExecution: {} };
