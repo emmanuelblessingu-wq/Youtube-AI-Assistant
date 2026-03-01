@@ -244,44 +244,105 @@ app.post('/api/generate-image', async (req, res) => {
 
     const fullPrompt = style ? `${prompt}, ${style} style` : prompt;
     
-    // Generate a placeholder SVG image with the prompt text
-    // This demonstrates the feature works - replace with real API call
-    const escapedPrompt = fullPrompt.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const lines = escapedPrompt.match(/.{1,35}/g) || [escapedPrompt];
+    console.log('[Image Generation] Generating image for prompt:', fullPrompt);
     
-    let textElements = '';
-    const startY = 200;
-    const lineHeight = 30;
-    lines.forEach((line, i) => {
-      const y = startY + (i * lineHeight);
-      textElements += `<text x="256" y="${y}" font-family="Arial, sans-serif" font-size="18" fill="#ffffff" text-anchor="middle">${line}</text>`;
+    // Use Hugging Face Stable Diffusion API (free tier, no auth required for basic use)
+    // Model: runwayml/stable-diffusion-v1-5 or stabilityai/stable-diffusion-2-1
+    const model = 'runwayml/stable-diffusion-v1-5';
+    const apiUrl = `https://api-inference.huggingface.co/models/${model}`;
+    
+    // Optional: Add Hugging Face token if you have one (for higher rate limits)
+    const hfToken = process.env.HUGGINGFACE_API_TOKEN || '';
+    const headers = {
+      'Content-Type': 'application/json',
+    };
+    if (hfToken) {
+      headers['Authorization'] = `Bearer ${hfToken}`;
+    }
+    
+    console.log('[Image Generation] Calling Hugging Face API...');
+    const hfResponse = await fetch(apiUrl, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify({
+        inputs: fullPrompt,
+        parameters: {
+          num_inference_steps: 30,
+          guidance_scale: 7.5,
+        },
+      }),
     });
     
-    const svg = `<svg width="512" height="512" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
-          <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
-        </linearGradient>
-      </defs>
-      <rect width="512" height="512" fill="url(#grad)"/>
-      <text x="256" y="150" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#ffffff" text-anchor="middle">🎨 Generated Image</text>
-      ${textElements}
-      <text x="256" y="450" font-family="Arial, sans-serif" font-size="14" fill="rgba(255,255,255,0.7)" text-anchor="middle">Image generation placeholder</text>
-    </svg>`;
+    if (!hfResponse.ok) {
+      const errorText = await hfResponse.text();
+      console.error('[Image Generation] Hugging Face API error:', hfResponse.status, errorText);
+      
+      // If rate limited or model loading, fall back to placeholder
+      if (hfResponse.status === 503 || hfResponse.status === 429) {
+        console.log('[Image Generation] API unavailable, using placeholder');
+        return generatePlaceholderImage(fullPrompt, res);
+      }
+      
+      throw new Error(`Image generation API error: ${hfResponse.status} - ${errorText}`);
+    }
     
-    const svgBase64 = Buffer.from(svg).toString('base64');
+    // Hugging Face returns the image as a blob
+    const imageBuffer = await hfResponse.arrayBuffer();
+    const imageBase64 = Buffer.from(imageBuffer).toString('base64');
+    
+    console.log('[Image Generation] Image generated successfully, size:', imageBuffer.byteLength);
     
     res.json({
       success: true,
-      imageData: svgBase64,
-      mimeType: 'image/svg+xml',
+      imageData: imageBase64,
+      mimeType: 'image/png',
     });
   } catch (err) {
-    console.error('Image generation error:', err);
-    res.status(500).json({ error: err.message || 'Failed to generate image' });
+    console.error('[Image Generation] Error:', err);
+    
+    // Fallback to placeholder on error
+    try {
+      return generatePlaceholderImage(req.body.prompt || 'image', res);
+    } catch (fallbackErr) {
+      res.status(500).json({ error: err.message || 'Failed to generate image' });
+    }
   }
 });
+
+// Helper function to generate placeholder SVG
+function generatePlaceholderImage(prompt, res) {
+  const escapedPrompt = String(prompt).replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const lines = escapedPrompt.match(/.{1,35}/g) || [escapedPrompt];
+  
+  let textElements = '';
+  const startY = 200;
+  const lineHeight = 30;
+  lines.forEach((line, i) => {
+    const y = startY + (i * lineHeight);
+    textElements += `<text x="256" y="${y}" font-family="Arial, sans-serif" font-size="18" fill="#ffffff" text-anchor="middle">${line}</text>`;
+  });
+  
+  const svg = `<svg width="512" height="512" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+        <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+      </linearGradient>
+    </defs>
+    <rect width="512" height="512" fill="url(#grad)"/>
+    <text x="256" y="150" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#ffffff" text-anchor="middle">🎨 Generated Image</text>
+    ${textElements}
+    <text x="256" y="450" font-family="Arial, sans-serif" font-size="14" fill="rgba(255,255,255,0.7)" text-anchor="middle">Image generation placeholder</text>
+  </svg>`;
+  
+  const svgBase64 = Buffer.from(svg).toString('base64');
+  
+  res.json({
+    success: true,
+    imageData: svgBase64,
+    mimeType: 'image/svg+xml',
+  });
+}
 
 const PORT = process.env.PORT || 3001;
 
