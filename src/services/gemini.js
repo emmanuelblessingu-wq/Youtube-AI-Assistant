@@ -51,21 +51,21 @@ export const streamChat = async function* (history, newMessage, imageParts = [],
       tools,
     });
 
-  const baseHistory = history.map((m) => ({
-    role: m.role === 'user' ? 'user' : 'model',
-    parts: [{ text: m.content || '' }],
-  }));
+    const baseHistory = history.map((m) => ({
+      role: m.role === 'user' ? 'user' : 'model',
+      parts: [{ text: m.content || '' }],
+    }));
 
-  const chatHistory = systemInstruction
-    ? [
-        {
-          role: 'user',
-          parts: [{ text: `Follow these instructions in every response:\n\n${systemInstruction}` }],
-        },
-        { role: 'model', parts: [{ text: "Got it! I'll follow those instructions." }] },
-        ...baseHistory,
-      ]
-    : baseHistory;
+    const chatHistory = systemInstruction
+      ? [
+          {
+            role: 'user',
+            parts: [{ text: `Follow these instructions in every response:\n\n${systemInstruction}` }],
+          },
+          { role: 'model', parts: [{ text: "Got it! I'll follow those instructions." }] },
+          ...baseHistory,
+        ]
+      : baseHistory;
 
     const chat = model.startChat({ history: chatHistory });
 
