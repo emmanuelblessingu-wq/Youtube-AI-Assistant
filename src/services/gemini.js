@@ -176,6 +176,10 @@ export const streamChat = async function* (history, newMessage, imageParts = [],
       throw new Error('Gemini API Error: Your API key was reported as leaked. This happens when an API key is exposed publicly (e.g., in GitHub, screenshots, or shared code).\n\nYou MUST:\n1. Go to https://aistudio.google.com/apikey\n2. Delete the old leaked key\n3. Create a NEW API key\n4. Update it in your .env file (local) and Render dashboard (production)\n5. NEVER commit API keys to GitHub - they should be in .env (which is gitignored)');
     }
     
+    if (error.message?.includes('400') || error.message?.includes('expired') || error.message?.includes('API_KEY_INVALID')) {
+      throw new Error('Gemini API Error: Your API key has expired or is invalid.\n\nTo fix this:\n1. Go to https://aistudio.google.com/apikey\n2. Check if your key is still active\n3. If expired, create a NEW API key\n4. Update your local .env file: REACT_APP_GEMINI_API_KEY=your_new_key\n5. Update Render dashboard → Frontend service → Environment → REACT_APP_GEMINI_API_KEY\n6. Restart your local app (if running locally)\n7. Redeploy in Render (Clear build cache & deploy)');
+    }
+    
     throw error;
   }
 };
