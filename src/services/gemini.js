@@ -78,50 +78,50 @@ export const streamChat = async function* (history, newMessage, imageParts = [],
 
     const result = await chat.sendMessageStream(parts);
 
-  // Stream text chunks for live display
-  for await (const chunk of result.stream) {
-    const chunkParts = chunk.candidates?.[0]?.content?.parts || [];
-    for (const part of chunkParts) {
-      if (part.text) yield { type: 'text', text: part.text };
+    // Stream text chunks for live display
+    for await (const chunk of result.stream) {
+      const chunkParts = chunk.candidates?.[0]?.content?.parts || [];
+      for (const part of chunkParts) {
+        if (part.text) yield { type: 'text', text: part.text };
+      }
     }
-  }
 
-  // After stream: inspect all response parts
-  const response = await result.response;
-  const allParts = response.candidates?.[0]?.content?.parts || [];
+    // After stream: inspect all response parts
+    const response = await result.response;
+    const allParts = response.candidates?.[0]?.content?.parts || [];
 
-  const hasCodeExecution = allParts.some(
-    (p) =>
-      p.executableCode ||
-      p.codeExecutionResult ||
-      (p.inlineData && p.inlineData.mimeType?.startsWith('image/'))
-  );
+    const hasCodeExecution = allParts.some(
+      (p) =>
+        p.executableCode ||
+        p.codeExecutionResult ||
+        (p.inlineData && p.inlineData.mimeType?.startsWith('image/'))
+    );
 
-  if (hasCodeExecution) {
-    // Build ordered structured parts to replace the streamed text
-    const structuredParts = allParts
-      .map((p) => {
-        if (p.text) return { type: 'text', text: p.text };
-        if (p.executableCode)
-          return {
-            type: 'code',
-            language: p.executableCode.language || 'PYTHON',
-            code: p.executableCode.code,
-          };
-        if (p.codeExecutionResult)
-          return {
-            type: 'result',
-            outcome: p.codeExecutionResult.outcome,
-            output: p.codeExecutionResult.output,
-          };
-        if (p.inlineData)
-          return { type: 'image', mimeType: p.inlineData.mimeType, data: p.inlineData.data };
-        return null;
-      })
-      .filter(Boolean);
+    if (hasCodeExecution) {
+      // Build ordered structured parts to replace the streamed text
+      const structuredParts = allParts
+        .map((p) => {
+          if (p.text) return { type: 'text', text: p.text };
+          if (p.executableCode)
+            return {
+              type: 'code',
+              language: p.executableCode.language || 'PYTHON',
+              code: p.executableCode.code,
+            };
+          if (p.codeExecutionResult)
+            return {
+              type: 'result',
+              outcome: p.codeExecutionResult.outcome,
+              output: p.codeExecutionResult.output,
+            };
+          if (p.inlineData)
+            return { type: 'image', mimeType: p.inlineData.mimeType, data: p.inlineData.data };
+          return null;
+        })
+        .filter(Boolean);
 
-    yield { type: 'fullResponse', parts: structuredParts };
-  }
+      yield { type: 'fullResponse', parts: structuredParts };
+    }
 
     // Grounding metadata (search sources)
     const grounding = response.candidates?.[0]?.groundingMetadata;
