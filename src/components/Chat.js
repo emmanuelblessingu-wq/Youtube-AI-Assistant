@@ -140,7 +140,13 @@ function GenerateImageCard({ chart }) {
         setLoading(true);
         setError(null);
         const apiUrl = process.env.REACT_APP_API_URL || '';
-        const response = await fetch(`${apiUrl}/api/generate-image`, {
+        const fullUrl = `${apiUrl}/api/generate-image`;
+        
+        console.log('[GenerateImage] Making request to:', fullUrl);
+        console.log('[GenerateImage] Prompt:', chart.prompt);
+        console.log('[GenerateImage] REACT_APP_API_URL:', apiUrl);
+        
+        const response = await fetch(fullUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

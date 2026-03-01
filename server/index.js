@@ -244,9 +244,18 @@ app.post('/api/save-json', async (req, res) => {
 // ── Generate image (placeholder - returns SVG with prompt text) ──────────────────
 // TODO: Connect to a real image generation API (Replicate, Stability AI, DALL-E, etc.)
 app.post('/api/generate-image', async (req, res) => {
+  console.log('[Image Generation] ====== REQUEST RECEIVED ======');
+  console.log('[Image Generation] Request body:', JSON.stringify(req.body));
+  console.log('[Image Generation] Request headers:', req.headers);
+  
   try {
     const { prompt, style } = req.body;
-    if (!prompt) return res.status(400).json({ error: 'prompt required' });
+    if (!prompt) {
+      console.log('[Image Generation] ❌ Missing prompt in request');
+      return res.status(400).json({ error: 'prompt required' });
+    }
+    
+    console.log('[Image Generation] ✅ Prompt received:', prompt);
 
     const fullPrompt = style ? `${prompt}, ${style} style` : prompt;
     
