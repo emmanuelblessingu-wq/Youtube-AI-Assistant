@@ -225,10 +225,17 @@ function GenerateImageCard({ chart }) {
 }
 
 function YoutubeToolOutput({ chart }) {
+  console.log('[YoutubeToolOutput] Rendering chart:', chart);
+  console.log('[YoutubeToolOutput] Chart _toolType:', chart._toolType);
+  
   if (chart._toolType === 'chart') return <MetricChart chart={chart} />;
   if (chart._toolType === 'videoCard') return <VideoCard chart={chart} />;
   if (chart._toolType === 'stats') return <StatsCard chart={chart} />;
-  if (chart._toolType === 'generateImage') return <GenerateImageCard chart={chart} />;
+  if (chart._toolType === 'generateImage') {
+    console.log('[YoutubeToolOutput] Rendering GenerateImageCard with chart:', chart);
+    return <GenerateImageCard chart={chart} />;
+  }
+  console.warn('[YoutubeToolOutput] Unknown chart type:', chart._toolType);
   return null;
 }
 
