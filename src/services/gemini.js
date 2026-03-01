@@ -3,8 +3,9 @@ import { CSV_TOOL_DECLARATIONS, YOUTUBE_TOOL_DECLARATIONS } from './csvTools';
 
 const genAI = new GoogleGenerativeAI(process.env.REACT_APP_GEMINI_API_KEY || '');
 
-// Model name for Gemini API - using the standard format without -latest suffix
-// The v1beta API requires specific model names. Try: gemini-1.5-flash, gemini-1.5-pro, or gemini-pro
+// Model name for Gemini API v1beta
+// Using gemini-1.5-flash which is the most stable and widely available model
+// If this doesn't work, the API key is likely invalid or doesn't have access
 const MODEL = 'gemini-1.5-flash';
 
 const SEARCH_TOOL = { googleSearch: {} };
@@ -37,9 +38,14 @@ async function loadSystemPrompt() {
 // Note: Gemini does not support both tools simultaneously.
 export const streamChat = async function* (history, newMessage, imageParts = [], useCodeExecution = false, userFullName = '') {
   // Check if API key is set
-  if (!process.env.REACT_APP_GEMINI_API_KEY) {
-    throw new Error('Gemini API key is not configured. Please set REACT_APP_GEMINI_API_KEY in your environment variables.');
+  const apiKey = process.env.REACT_APP_GEMINI_API_KEY;
+  if (!apiKey || apiKey.trim() === '') {
+    throw new Error('Gemini API key is not configured. Please set REACT_APP_GEMINI_API_KEY in your Render environment variables and redeploy.');
   }
+  
+  // Log for debugging (will show in browser console)
+  console.log('[Gemini] Using model:', MODEL);
+  console.log('[Gemini] API key present:', !!apiKey, 'Length:', apiKey?.length);
 
   let systemInstruction = await loadSystemPrompt();
   if (userFullName) systemInstruction += `\n\nThe user's full name is ${userFullName}. Address them by their first name in your first response of each conversation.`;
@@ -131,10 +137,29 @@ export const streamChat = async function* (history, newMessage, imageParts = [],
     }
   } catch (error) {
     console.error('[Gemini API Error]', error);
+    console.error('[Gemini API Error Details]', {
+      model: MODEL,
+      apiKeyPresent: !!process.env.REACT_APP_GEMINI_API_KEY,
+      errorMessage: error.message,
+      errorStack: error.stack
+    });
+    
     // Provide a more helpful error message
     if (error.message?.includes('404') || error.message?.includes('not found')) {
-      throw new Error(`Gemini model "${MODEL}" is not available. This might be due to:\n1. Invalid or missing API key\n2. Model not available in your region\n3. API key doesn't have access to this model\n\nPlease check your REACT_APP_GEMINI_API_KEY in Render dashboard.`);
+      const errorMsg = `Gemini API Error: Model "${MODEL}" returned 404.\n\n` +
+        `This usually means:\n` +
+        `1. Your API key is invalid or expired - Get a new one at https://aistudio.google.com/apikey\n` +
+        `2. The API key isn't set in Render - Check Environment tab in Render dashboard\n` +
+        `3. You need to REDEPLOY after setting the key - Manual Deploy → Clear build cache & deploy\n` +
+        `4. The model name might be wrong - Currently using: ${MODEL}\n\n` +
+        `Check browser console for more details.`;
+      throw new Error(errorMsg);
     }
+    
+    if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
+      throw new Error('Gemini API Error: Unauthorized. Your API key is invalid or expired. Please get a new key from https://aistudio.google.com/apikey and update it in Render.');
+    }
+    
     throw error;
   }
 };
