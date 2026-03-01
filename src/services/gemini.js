@@ -48,6 +48,17 @@ export const streamChat = async function* (history, newMessage, imageParts = [],
   // Log for debugging (will show in browser console)
   console.log('[Gemini] Using model:', MODEL);
   console.log('[Gemini] API key present:', !!apiKey, 'Length:', apiKey?.length);
+  
+  // Try to list available models to debug
+  try {
+    const modelsResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    if (modelsResponse.ok) {
+      const modelsData = await modelsResponse.json();
+      console.log('[Gemini] Available models:', modelsData.models?.map(m => m.name).filter(n => n?.includes('gemini')).slice(0, 10));
+    }
+  } catch (e) {
+    console.warn('[Gemini] Could not list models:', e);
+  }
 
   let systemInstruction = await loadSystemPrompt();
   if (userFullName) systemInstruction += `\n\nThe user's full name is ${userFullName}. Address them by their first name in your first response of each conversation.`;
