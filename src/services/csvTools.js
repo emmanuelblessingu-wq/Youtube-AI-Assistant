@@ -358,14 +358,13 @@ export const YOUTUBE_TOOL_DECLARATIONS = [
   {
     name: 'generateImage',
     description:
-      'Generate an image from a text prompt. ALWAYS call this tool when the user asks to generate, create, make, or visualize an image. ' +
-      'This tool will create and display the image automatically. Do not apologize or say you cannot generate images - just call this tool. ' +
-      'Optionally uses an anchor/reference image dragged into chat.',
+      'Generate an image from a text prompt. Optionally uses an anchor/reference image dragged into chat. ' +
+      'Call when user asks to generate, create, or make an image.',
     parameters: {
       type: 'OBJECT',
       properties: {
-        prompt: { type: 'STRING', description: 'Text description of the image to generate. Be specific and detailed.' },
-        style: { type: 'STRING', description: 'Style: realistic, cartoon, watercolor, abstract, etc. Default: realistic' },
+        prompt: { type: 'STRING', description: 'Text description of the image to generate' },
+        style: { type: 'STRING', description: 'Style: realistic, cartoon, watercolor, etc.' },
       },
       required: ['prompt'],
     },
@@ -429,13 +428,11 @@ export const executeYoutubeTool = (toolName, args, channelData) => {
   switch (toolName) {
     case 'generateImage': {
       // Signal to the UI to generate an image
-      console.log('[generateImage] Tool called with prompt:', args.prompt, 'style:', args.style);
       return {
         _toolType: 'generateImage',
         prompt: args.prompt,
         style: args.style || 'realistic',
-        success: true,
-        message: `Image generation started for: "${args.prompt}". The image will be displayed below.`,
+        status: 'Image generation requested. Display the generateImage component.',
       };
     }
 

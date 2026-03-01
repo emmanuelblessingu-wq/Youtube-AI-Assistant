@@ -130,182 +130,36 @@ function StatsCard({ chart }) {
 }
 
 function GenerateImageCard({ chart }) {
-  const [imgSrc, setImgSrc] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [enlarged, setEnlarged] = useState(false);
+  const [imgSrc, setImgSrc] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState(false);
 
-  useEffect(() => {
-    if (!chart.prompt) return;
-
-    // Build prompt with style if provided
-    const fullPrompt = chart.style 
-      ? `${chart.prompt}, ${chart.style} style`
-      : chart.prompt;
-    
-    // Clean and encode prompt for URL
-    const cleanPrompt = fullPrompt.trim();
-    const encodedPrompt = encodeURIComponent(cleanPrompt);
-    
-    // Pollinations AI URL - generates images on the fly
-    // Try without CORS first (works better for direct image display)
-    const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true&seed=${Date.now()}`;
-    
-    console.log('[GenerateImage] Using Pollinations AI for prompt:', cleanPrompt);
+  React.useEffect(() => {
+    const prompt = encodeURIComponent(`${chart.prompt}${chart.style ? ', ' + chart.style + ' style' : ''}`);
+    const url = `https://image.pollinations.ai/prompt/${prompt}?width=512&height=512&nologo=true`;
     setImgSrc(url);
     setLoading(true);
-    setError(null);
-
-    let retryCount = 0;
-    const maxRetries = 2;
-    let timeoutCleared = false;
-    let timeout;
-
-    const tryLoadImage = (url, useCors = false) => {
-      const img = new Image();
-      
-      // Only use CORS if needed for download, not for display
-      if (useCors) {
-        img.crossOrigin = 'anonymous';
-      }
-      
-      img.onload = () => {
-        console.log('[GenerateImage] Image loaded successfully');
-        timeoutCleared = true;
-        if (timeout) clearTimeout(timeout);
-        setLoading(false);
-        setError(null);
-      };
-      
-      img.onerror = (err) => {
-        console.error('[GenerateImage] Failed to load image (attempt ' + (retryCount + 1) + '):', err);
-        
-        // Retry with a different seed if first attempt fails
-        if (retryCount < maxRetries) {
-          retryCount++;
-          if (timeout) clearTimeout(timeout);
-          const retryUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true&enhance=true&seed=${Date.now() + retryCount}`;
-          console.log('[GenerateImage] Retrying with new URL...');
-          setTimeout(() => tryLoadImage(retryUrl, useCors), 2000);
-        } else {
-          timeoutCleared = true;
-          if (timeout) clearTimeout(timeout);
-          setLoading(false);
-          setError('Failed to generate image. The service may be temporarily unavailable. Please try again in a moment.');
-        }
-      };
-
-      // Set a timeout in case the image takes too long
-      if (timeout) clearTimeout(timeout);
-      timeout = setTimeout(() => {
-        if (!timeoutCleared) {
-          console.warn('[GenerateImage] Image loading timeout');
-          setLoading(false);
-          if (retryCount < maxRetries) {
-            retryCount++;
-            const retryUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true&enhance=true&seed=${Date.now() + retryCount}`;
-            console.log('[GenerateImage] Retrying after timeout...');
-            tryLoadImage(retryUrl, useCors);
-          } else {
-            setError('Image generation is taking longer than expected. Please try again.');
-          }
-        }
-      }, 45000); // 45 second timeout
-
-      img.src = url;
-    };
-
-    tryLoadImage(url, false);
-
-    return () => {
-      timeoutCleared = true;
-      if (timeout) clearTimeout(timeout);
-    };
+    setError(false);
   }, [chart.prompt, chart.style]);
-
-  const handleDownload = async () => {
-    if (!imgSrc) return;
-    
-    try {
-      // Fetch the image with CORS
-      const response = await fetch(imgSrc, { mode: 'cors' });
-      if (!response.ok) throw new Error('Failed to fetch image');
-      
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `generated-image-${Date.now()}.png`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('[GenerateImage] Download error:', err);
-      // Fallback: open image in new tab for manual download
-      window.open(imgSrc, '_blank');
-    }
-  };
 
   return (
     <div className="yt-genimage-card">
       <p className="yt-genimage-label">🎨 Generated Image</p>
       <p className="yt-genimage-prompt">Prompt: <em>{chart.prompt}</em></p>
-      {chart.style && <p className="yt-genimage-prompt" style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>Style: <em>{chart.style}</em></p>}
-
-      {loading && <p className="yt-genimage-note">Generating image... (this may take 10-30 seconds)</p>}
-      {error && <p className="yt-genimage-error">{error}</p>}
-
+      {loading && !error && (
+        <div className="yt-genimage-loading">Generating image…</div>
+      )}
       {imgSrc && (
-        <>
-          <div className="yt-genimage-preview" onClick={() => setEnlarged(true)}>
-            <img
-              src={imgSrc}
-              alt={chart.prompt}
-              className="yt-genimage-img"
-              onLoad={() => setLoading(false)}
-              onError={() => {
-                setLoading(false);
-                setError('Failed to load generated image. Please try again.');
-              }}
-              style={{ 
-                display: loading ? 'none' : 'block',
-                maxWidth: '100%', 
-                borderRadius: '8px', 
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
-              }}
-              crossOrigin="anonymous"
-            />
-          </div>
-          {!loading && !error && (
-            <div className="yt-genimage-actions">
-              <button onClick={handleDownload} className="yt-genimage-download">💾 Download</button>
-              <button onClick={() => setEnlarged(true)} className="yt-genimage-enlarge">🔍 Enlarge</button>
-            </div>
-          )}
-        </>
+        <img
+          src={imgSrc}
+          alt={chart.prompt}
+          className="yt-genimage-img"
+          onLoad={() => setLoading(false)}
+          onError={() => { setLoading(false); setError(true); }}
+          style={{ display: loading ? 'none' : 'block' }}
+        />
       )}
-
-      {enlarged && imgSrc && !loading && (
-        <div className="yt-chart-overlay" onClick={() => setEnlarged(false)}>
-          <div className="yt-chart-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="yt-chart-modal-header">
-              <span>Generated Image</span>
-              <button onClick={() => setEnlarged(false)} className="yt-chart-close">✕</button>
-            </div>
-            <img
-              src={imgSrc}
-              alt={chart.prompt}
-              style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: '8px' }}
-              crossOrigin="anonymous"
-            />
-            <div style={{ padding: '1rem', textAlign: 'center' }}>
-              <button onClick={handleDownload} className="yt-genimage-download">💾 Download Image</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {error && <p className="yt-genimage-note">Image generation failed. Try a different prompt.</p>}
     </div>
   );
 }
@@ -534,30 +388,9 @@ export default function Chat({ username, firstName, lastName, onLogout }) {
     setDragOver(false);
     const files = [...e.dataTransfer.files];
 
-    // Filter files by type - be strict about image detection
-    const jsonFiles = files.filter((f) => 
-      f.name.toLowerCase().endsWith('.json') || 
-      f.type === 'application/json' ||
-      f.type === 'text/json'
-    );
-    const csvFiles = files.filter((f) => 
-      f.name.toLowerCase().endsWith('.csv') || 
-      f.type === 'text/csv' ||
-      f.type === 'application/csv'
-    );
-    // Only accept files that explicitly have image/ MIME type
-    const imageFiles = files.filter((f) => 
-      f.type && f.type.startsWith('image/') && 
-      !f.name.toLowerCase().endsWith('.json') && 
-      !f.name.toLowerCase().endsWith('.csv')
-    );
-    
-    // Log unrecognized files for debugging
-    const recognizedFiles = [...jsonFiles, ...csvFiles, ...imageFiles];
-    const unrecognized = files.filter(f => !recognizedFiles.includes(f));
-    if (unrecognized.length > 0) {
-      console.warn('[File Upload] Unrecognized file types:', unrecognized.map(f => ({ name: f.name, type: f.type })));
-    }
+    const jsonFiles = files.filter((f) => f.name.endsWith('.json') || f.type === 'application/json');
+    const csvFiles = files.filter((f) => f.name.endsWith('.csv') || f.type === 'text/csv');
+    const imageFiles = files.filter((f) => f.type.startsWith('image/'));
 
     if (jsonFiles.length > 0) {
       const text = await fileToText(jsonFiles[0]);
@@ -593,28 +426,13 @@ export default function Chat({ username, firstName, lastName, onLogout }) {
 
     if (imageFiles.length > 0) {
       const newImages = await Promise.all(
-        imageFiles.map(async (f) => {
-          try {
-            const data = await fileToBase64(f);
-            if (!data || data.trim() === '') {
-              console.error('[File Upload] Failed to read image file:', f.name);
-              return null;
-            }
-            return {
-              data,
-              mimeType: f.type || 'image/png', // fallback to png if type is missing
-              name: f.name,
-            };
-          } catch (err) {
-            console.error('[File Upload] Error reading image file:', f.name, err);
-            return null;
-          }
-        })
+        imageFiles.map(async (f) => ({
+          data: await fileToBase64(f),
+          mimeType: f.type,
+          name: f.name,
+        }))
       );
-      const validNewImages = newImages.filter(Boolean);
-      if (validNewImages.length > 0) {
-        setImages((prev) => [...prev, ...validNewImages]);
-      }
+      setImages((prev) => [...prev, ...newImages]);
     }
   };
 
@@ -622,30 +440,9 @@ export default function Chat({ username, firstName, lastName, onLogout }) {
     const files = [...e.target.files];
     e.target.value = '';
 
-    // Filter files by type - be strict about image detection
-    const jsonFiles = files.filter((f) => 
-      f.name.toLowerCase().endsWith('.json') || 
-      f.type === 'application/json' ||
-      f.type === 'text/json'
-    );
-    const csvFiles = files.filter((f) => 
-      f.name.toLowerCase().endsWith('.csv') || 
-      f.type === 'text/csv' ||
-      f.type === 'application/csv'
-    );
-    // Only accept files that explicitly have image/ MIME type
-    const imageFiles = files.filter((f) => 
-      f.type && f.type.startsWith('image/') && 
-      !f.name.toLowerCase().endsWith('.json') && 
-      !f.name.toLowerCase().endsWith('.csv')
-    );
-    
-    // Log unrecognized files for debugging
-    const recognizedFiles = [...jsonFiles, ...csvFiles, ...imageFiles];
-    const unrecognized = files.filter(f => !recognizedFiles.includes(f));
-    if (unrecognized.length > 0) {
-      console.warn('[File Upload] Unrecognized file types:', unrecognized.map(f => ({ name: f.name, type: f.type })));
-    }
+    const jsonFiles = files.filter((f) => f.name.endsWith('.json') || f.type === 'application/json');
+    const csvFiles = files.filter((f) => f.name.endsWith('.csv') || f.type === 'text/csv');
+    const imageFiles = files.filter((f) => f.type.startsWith('image/'));
 
     if (jsonFiles.length > 0) {
       const text = await fileToText(jsonFiles[0]);
@@ -678,28 +475,13 @@ export default function Chat({ username, firstName, lastName, onLogout }) {
     }
     if (imageFiles.length > 0) {
       const newImages = await Promise.all(
-        imageFiles.map(async (f) => {
-          try {
-            const data = await fileToBase64(f);
-            if (!data || data.trim() === '') {
-              console.error('[File Upload] Failed to read image file:', f.name);
-              return null;
-            }
-            return {
-              data,
-              mimeType: f.type || 'image/png', // fallback to png if type is missing
-              name: f.name,
-            };
-          } catch (err) {
-            console.error('[File Upload] Error reading image file:', f.name, err);
-            return null;
-          }
-        })
+        imageFiles.map(async (f) => ({
+          data: await fileToBase64(f),
+          mimeType: f.type,
+          name: f.name,
+        }))
       );
-      const validNewImages = newImages.filter(Boolean);
-      if (validNewImages.length > 0) {
-        setImages((prev) => [...prev, ...validNewImages]);
-      }
+      setImages((prev) => [...prev, ...newImages]);
     }
   };
 
@@ -828,56 +610,10 @@ ${sessionSummary}${slimCsvBlock}
     setCsvContext(null);
     setStreaming(true);
 
-    // Validate images before sending - only send actual image files with valid data
-    const validImages = capturedImages.filter((img) => {
-      // Check MIME type
-      if (!img.mimeType || !img.mimeType.startsWith('image/')) {
-        console.warn('[Chat] Filtered out non-image file:', { mimeType: img.mimeType, name: img.name });
-        return false;
-      }
-      
-      // Check if data exists and is not empty
-      if (!img.data || typeof img.data !== 'string' || img.data.trim() === '') {
-        console.warn('[Chat] Filtered out image with empty data:', { mimeType: img.mimeType, name: img.name });
-        return false;
-      }
-      
-      // Validate base64 format (basic check)
-      const base64Regex = /^[A-Za-z0-9+/=]+$/;
-      if (!base64Regex.test(img.data)) {
-        console.warn('[Chat] Filtered out image with invalid base64:', { mimeType: img.mimeType, name: img.name });
-        return false;
-      }
-      
-      // Check supported MIME types for Gemini
-      const supportedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif'];
-      if (!supportedTypes.includes(img.mimeType.toLowerCase())) {
-        console.warn('[Chat] Filtered out unsupported image type:', { mimeType: img.mimeType, name: img.name });
-        return false;
-      }
-      
-      // Check data size (Gemini has limits - roughly 4MB per image)
-      const estimatedSize = (img.data.length * 3) / 4; // approximate base64 to bytes
-      if (estimatedSize > 4 * 1024 * 1024) {
-        console.warn('[Chat] Filtered out image that is too large:', { 
-          mimeType: img.mimeType, 
-          name: img.name, 
-          estimatedSize: `${(estimatedSize / 1024 / 1024).toFixed(2)}MB` 
-        });
-        return false;
-      }
-      
-      return true;
-    });
-
-    if (capturedImages.length > 0 && validImages.length === 0) {
-      console.error('[Chat] All images were filtered out. Original count:', capturedImages.length);
-    }
-
     // Store display text only — base64 is never persisted
-    await saveMessage(sessionId, 'user', userContent, validImages.length ? validImages : null);
+    await saveMessage(sessionId, 'user', userContent, capturedImages.length ? capturedImages : null);
 
-    const imageParts = validImages.map((img) => ({ mimeType: img.mimeType, data: img.data }));
+    const imageParts = capturedImages.map((img) => ({ mimeType: img.mimeType, data: img.data }));
 
     // History: plain display text only — session summary handles CSV context on every message
     const history = messages
@@ -1240,7 +976,7 @@ ${sessionSummary}${slimCsvBlock}
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*,.csv,text/csv,.json,application/json"
+            accept="image/*,.csv,text/csv"
             multiple
             style={{ display: 'none' }}
             onChange={handleFileSelect}

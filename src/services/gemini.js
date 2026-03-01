@@ -3,7 +3,7 @@ import { CSV_TOOL_DECLARATIONS, YOUTUBE_TOOL_DECLARATIONS } from './csvTools';
 
 const genAI = new GoogleGenerativeAI(process.env.REACT_APP_GEMINI_API_KEY || '');
 
-const MODEL = 'gemini-2.5-flash';
+const MODEL = 'gemini-1.5-flash';
 
 const SEARCH_TOOL = { googleSearch: {} };
 const CODE_EXEC_TOOL = { codeExecution: {} };
@@ -232,14 +232,11 @@ export const chatWithYoutubeTools = async (history, newMessage, channelData, exe
     if (!funcCall) break;
 
     const { name, args } = funcCall.functionCall;
-    console.log('[YouTube Tools] Tool called:', name, 'with args:', args);
     const toolResult = executeFn(name, args);
-    console.log('[YouTube Tools] Tool result:', toolResult);
     toolCalls.push({ name, args, result: toolResult });
 
     if (toolResult?._toolType === 'chart' || toolResult?._toolType === 'videoCard' ||
         toolResult?._toolType === 'stats' || toolResult?._toolType === 'generateImage') {
-      console.log('[YouTube Tools] Adding to charts:', toolResult._toolType);
       charts.push(toolResult);
     }
 

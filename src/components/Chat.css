@@ -1080,24 +1080,6 @@
 .yt-genimage-label { font-size: 0.85rem; font-weight: 700; color: rgba(236,72,153,0.9); margin: 0 0 0.4rem; }
 .yt-genimage-prompt { font-size: 0.82rem; color: rgba(255,255,255,0.7); margin: 0 0 0.3rem; }
 .yt-genimage-note { font-size: 0.75rem; color: rgba(255,255,255,0.35); margin: 0; }
-.yt-genimage-error { font-size: 0.8rem; color: rgba(248,113,113,0.9); margin: 0.5rem 0; }
-.yt-genimage-preview { margin: 0.8rem 0; cursor: pointer; }
-.yt-genimage-preview img { max-width: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
-.yt-genimage-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
-.yt-genimage-download, .yt-genimage-enlarge {
-  padding: 0.5rem 1rem;
-  background: rgba(168,85,247,0.2);
-  border: 1px solid rgba(168,85,247,0.4);
-  border-radius: 8px;
-  color: #c084fc;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.yt-genimage-download:hover, .yt-genimage-enlarge:hover {
-  background: rgba(168,85,247,0.3);
-}
 
 /* channel data badge in messages */
 .msg-channel-badge {
@@ -1105,4 +1087,17 @@
   background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.25);
   border-radius: 6px; padding: 0.2rem 0.5rem;
   font-size: 0.75rem; color: rgba(239,68,68,0.8); margin-bottom: 0.3rem;
+}
+
+.yt-genimage-img {
+  width: 100%;
+  border-radius: 10px;
+  margin-top: 0.75rem;
+}
+
+.yt-genimage-loading {
+  text-align: center;
+  padding: 2rem;
+  color: rgba(255,255,255,0.4);
+  font-size: 0.85rem;
 }
