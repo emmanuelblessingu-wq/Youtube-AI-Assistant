@@ -4,11 +4,12 @@ import { CSV_TOOL_DECLARATIONS, YOUTUBE_TOOL_DECLARATIONS } from './csvTools';
 const genAI = new GoogleGenerativeAI(process.env.REACT_APP_GEMINI_API_KEY || '');
 
 // Model name for Gemini API
-// CHANGE THIS LINE to use a different model
-// Available models: gemini-pro, gemini-1.5-flash, gemini-1.5-pro
-// The v1beta API may have limited model support
-// Try: gemini-pro (most basic, should work)
-const MODEL = 'gemini-pro';
+// The v1beta API doesn't support gemini-pro or gemini-1.5-flash
+// Try using the model ID format that works with the SDK version
+// Based on @google/generative-ai v0.24.1, try these in order:
+const MODEL = 'gemini-1.5-flash-latest';  // Try this first
+// If that fails, the API key might not have access to newer models
+// Fallback options: 'gemini-1.5-pro-latest', 'models/gemini-1.5-flash'
 
 const SEARCH_TOOL = { googleSearch: {} };
 const CODE_EXEC_TOOL = { codeExecution: {} };
