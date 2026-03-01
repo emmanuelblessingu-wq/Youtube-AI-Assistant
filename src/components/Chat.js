@@ -132,84 +132,67 @@ function StatsCard({ chart }) {
 function GenerateImageCard({ chart }) {
   const [imgSrc, setImgSrc] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState(null);
+  const [error, setError] = React.useState(false);
+  const [attempt, setAttempt] = React.useState(0);
+
+  const getUrl = React.useCallback((tryNum) => {
+    const rawPrompt = `${chart.prompt}${chart.style ? ', ' + chart.style + ' style' : ''}`;
+    const prompt = encodeURIComponent(rawPrompt);
+    const seed = Math.floor(Math.random() * 999999);
+    // Lexica Art API endpoints - using their image generation API
+    const urls = [
+      `https://image.lexica.art/full_jpg/${prompt}?seed=${seed}&width=512&height=512`,
+      `https://image.lexica.art/full_jpg/${prompt}?width=512&height=512`,
+      `https://lexica.art/api/v1/generate?prompt=${prompt}&width=512&height=512&seed=${seed}`,
+    ];
+    return urls[Math.min(tryNum, urls.length - 1)];
+  }, [chart.prompt, chart.style]);
 
   React.useEffect(() => {
-    if (!chart?.prompt) return;
-
-    const prompt = encodeURIComponent(`${chart.prompt}${chart.style ? ', ' + chart.style + ' style' : ''}`);
-    const url = `https://image.pollinations.ai/prompt/${prompt}?width=512&height=512&nologo=true&seed=${Date.now()}`;
-    
-    console.log('[GenerateImageCard] Setting image URL:', url);
-    setImgSrc(url);
+    setImgSrc(getUrl(0));
     setLoading(true);
-    setError(null);
+    setError(false);
+    setAttempt(0);
+  }, [chart.prompt, chart.style]);
 
-    // Set a timeout to prevent infinite loading
-    const timeout = setTimeout(() => {
-      if (loading) {
-        console.warn('[GenerateImageCard] Image loading timeout after 30 seconds');
-        setLoading(false);
-        setError('Image generation is taking longer than expected. The service may be busy. Please try again in a moment.');
-      }
-    }, 30000); // 30 second timeout
-
-    // Create image element to check if it loads
-    const img = new Image();
-    
-    img.onload = () => {
-      console.log('[GenerateImageCard] Image loaded successfully');
-      clearTimeout(timeout);
+  const handleError = () => {
+    if (attempt < 2) {
+      const next = attempt + 1;
+      setAttempt(next);
+      setImgSrc(getUrl(next));
+    } else {
       setLoading(false);
-      setError(null);
-    };
-    
-    img.onerror = (err) => {
-      console.error('[GenerateImageCard] Image failed to load:', err);
-      clearTimeout(timeout);
-      setLoading(false);
-      // Check if it's a 530 error (service unavailable)
-      setError('Image generation service is temporarily unavailable (Error 530). Please try again in a few moments.');
-    };
-
-    img.src = url;
-
-    return () => {
-      clearTimeout(timeout);
-    };
-  }, [chart?.prompt, chart?.style]);
+      setError(true);
+    }
+  };
 
   return (
     <div className="yt-genimage-card">
       <p className="yt-genimage-label">🎨 Generated Image</p>
-      <p className="yt-genimage-prompt">Prompt: <em>{chart?.prompt}</em></p>
-      
+      <p className="yt-genimage-prompt">Prompt: <em>{chart.prompt}</em></p>
       {loading && !error && (
-        <div className="yt-genimage-loading">
-          Generating image… (this may take 10-30 seconds)
-          <br />
-          <small style={{ opacity: 0.7 }}>If this takes too long, the service may be busy</small>
-        </div>
+        <div className="yt-genimage-loading">Generating image… (this may take 10-20 seconds)</div>
       )}
-      
-      {error && (
-        <p className="yt-genimage-error" style={{ color: '#f87171', marginTop: '0.5rem' }}>
-          {error}
-        </p>
-      )}
-      
-      {imgSrc && !loading && !error && (
+      {imgSrc && (
         <img
           src={imgSrc}
-          alt={chart?.prompt}
+          alt={chart.prompt}
           className="yt-genimage-img"
-          style={{ 
-            maxWidth: '100%', 
-            borderRadius: '8px', 
-            marginTop: '0.5rem',
-            display: 'block'
-          }}
+          onLoad={() => setLoading(false)}
+          onError={handleError}
+          style={{ display: loading ? 'none' : 'block' }}
+          referrerPolicy="no-referrer"
+          crossOrigin="anonymous"
         />
+      )}
+      {error && (
+        <div>
+          <p className="yt-genimage-note">Image generation timed out. Try asking again.</p>
+          <button onClick={() => { setImgSrc(getUrl(0)); setLoading(true); setError(false); setAttempt(0); }}
+            style={{marginTop:'0.5rem',padding:'0.4rem 1rem',borderRadius:'6px',background:'#7c3aed',color:'white',border:'none',cursor:'pointer'}}>
+            Retry
+          </button>
+        </div>
       )}
     </div>
   );
