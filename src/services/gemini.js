@@ -47,6 +47,10 @@ export const streamChat = async function* (history, newMessage, imageParts = [],
   // Log for debugging (will show in browser console)
   console.log('[Gemini] Using model:', MODEL);
   console.log('[Gemini] API key present:', !!apiKey, 'Length:', apiKey?.length);
+  // Show first 10 and last 4 chars for verification (never log full key!)
+  if (apiKey) {
+    console.log('[Gemini] API key preview:', apiKey.substring(0, 10) + '...' + apiKey.substring(apiKey.length - 4));
+  }
   
   // Try to list available models to debug
   try {
