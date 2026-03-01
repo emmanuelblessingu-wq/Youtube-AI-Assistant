@@ -143,48 +143,83 @@ function GenerateImageCard({ chart }) {
       ? `${chart.prompt}, ${chart.style} style`
       : chart.prompt;
     
-    // Encode prompt for URL
-    const encodedPrompt = encodeURIComponent(fullPrompt);
+    // Clean and encode prompt for URL
+    const cleanPrompt = fullPrompt.trim();
+    const encodedPrompt = encodeURIComponent(cleanPrompt);
     
     // Pollinations AI URL - generates images on the fly
-    const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true&enhance=true`;
+    // Try without CORS first (works better for direct image display)
+    const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true&enhance=true&seed=${Date.now()}`;
     
-    console.log('[GenerateImage] Using Pollinations AI for prompt:', fullPrompt);
+    console.log('[GenerateImage] Using Pollinations AI for prompt:', cleanPrompt);
     setImgSrc(pollinationsUrl);
     setLoading(true);
     setError(null);
 
-    // Create an image element to preload and check if it loads successfully
-    const img = new Image();
-    img.crossOrigin = 'anonymous'; // Enable CORS for downloading
-    
-    img.onload = () => {
-      console.log('[GenerateImage] Image loaded successfully');
-      setLoading(false);
-      setError(null);
-    };
-    
-    img.onerror = (err) => {
-      console.error('[GenerateImage] Failed to load image:', err);
-      setLoading(false);
-      setError('Failed to generate image. Please try again with a different prompt.');
-    };
-
-    // Set a timeout in case the image takes too long
+    let retryCount = 0;
+    const maxRetries = 2;
     let timeoutCleared = false;
-    const timeout = setTimeout(() => {
-      if (!timeoutCleared) {
-        console.warn('[GenerateImage] Image loading timeout');
-        setLoading(false);
-        // Don't set error on timeout - image might still load
-      }
-    }, 30000); // 30 second timeout
+    let timeout;
 
-    img.src = pollinationsUrl;
+    const tryLoadImage = (url, useCors = false) => {
+      const img = new Image();
+      
+      // Only use CORS if needed for download, not for display
+      if (useCors) {
+        img.crossOrigin = 'anonymous';
+      }
+      
+      img.onload = () => {
+        console.log('[GenerateImage] Image loaded successfully');
+        timeoutCleared = true;
+        if (timeout) clearTimeout(timeout);
+        setLoading(false);
+        setError(null);
+      };
+      
+      img.onerror = (err) => {
+        console.error('[GenerateImage] Failed to load image (attempt ' + (retryCount + 1) + '):', err);
+        
+        // Retry with a different seed if first attempt fails
+        if (retryCount < maxRetries) {
+          retryCount++;
+          if (timeout) clearTimeout(timeout);
+          const retryUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true&enhance=true&seed=${Date.now() + retryCount}`;
+          console.log('[GenerateImage] Retrying with new URL...');
+          setTimeout(() => tryLoadImage(retryUrl, useCors), 2000);
+        } else {
+          timeoutCleared = true;
+          if (timeout) clearTimeout(timeout);
+          setLoading(false);
+          setError('Failed to generate image. The service may be temporarily unavailable. Please try again in a moment.');
+        }
+      };
+
+      // Set a timeout in case the image takes too long
+      if (timeout) clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        if (!timeoutCleared) {
+          console.warn('[GenerateImage] Image loading timeout');
+          setLoading(false);
+          if (retryCount < maxRetries) {
+            retryCount++;
+            const retryUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true&enhance=true&seed=${Date.now() + retryCount}`;
+            console.log('[GenerateImage] Retrying after timeout...');
+            tryLoadImage(retryUrl, useCors);
+          } else {
+            setError('Image generation is taking longer than expected. Please try again.');
+          }
+        }
+      }, 45000); // 45 second timeout
+
+      img.src = url;
+    };
+
+    tryLoadImage(pollinationsUrl, false);
 
     return () => {
       timeoutCleared = true;
-      clearTimeout(timeout);
+      if (timeout) clearTimeout(timeout);
     };
   }, [chart.prompt, chart.style]);
 
