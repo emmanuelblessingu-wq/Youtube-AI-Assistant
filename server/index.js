@@ -254,8 +254,9 @@ app.post('/api/generate-image', async (req, res) => {
     
     // Use Hugging Face Inference API
     // Model: runwayml/stable-diffusion-v1-5
+    // Note: Some models may need to be loaded first (503), which can take 30-60 seconds
     const model = 'runwayml/stable-diffusion-v1-5';
-    // Try inference API endpoint first (more reliable)
+    // Use inference API endpoint
     const apiUrl = `https://api-inference.huggingface.co/models/${model}`;
     
     // Hugging Face token - now required for most models
@@ -281,9 +282,10 @@ app.post('/api/generate-image', async (req, res) => {
     console.log('[Image Generation] Model:', model);
     console.log('[Image Generation] Prompt:', fullPrompt.substring(0, 100));
     
-    // Add timeout to prevent hanging (60 seconds for image generation)
+    // Add longer timeout - Hugging Face models may need to load first (can take 30-60s)
+    // Then image generation itself takes 20-40 seconds
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000);
+    const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutes total
     
     try {
       const requestBody = {
@@ -313,43 +315,70 @@ app.post('/api/generate-image', async (req, res) => {
         console.error('[Image Generation] Hugging Face API error:', hfResponse.status);
         console.error('[Image Generation] Error response (first 500 chars):', errorText.substring(0, 500));
         
-        // If model is loading (503), wait a bit and retry once
+        // If model is loading (503), wait longer and retry multiple times
         if (hfResponse.status === 503) {
-          console.log('[Image Generation] Model loading, waiting 5 seconds and retrying...');
-          await new Promise(resolve => setTimeout(resolve, 5000));
+          console.log('[Image Generation] Model is loading (503). This can take 30-60 seconds...');
           
-          const retryResponse = await fetch(apiUrl, {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify({
-              inputs: fullPrompt,
-              parameters: {
-                num_inference_steps: 30,
-                guidance_scale: 7.5,
-              },
-            }),
-            signal: controller.signal,
-          });
-          
-          if (!retryResponse.ok) {
-            const retryErrorText = await retryResponse.text();
-            console.error('[Image Generation] Retry failed:', retryResponse.status, retryErrorText);
-            return res.status(503).json({ 
-              error: 'Image generation service is temporarily unavailable. Please try again in a moment.',
-              fallback: true 
-            });
+          // Try up to 3 times with increasing wait times
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            const waitTime = attempt * 20; // 20s, 40s, 60s
+            console.log(`[Image Generation] Waiting ${waitTime} seconds before retry ${attempt}/3...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime * 1000));
+            
+            const retryController = new AbortController();
+            const retryTimeout = setTimeout(() => retryController.abort(), 90000); // 90s timeout per retry
+            
+            try {
+              const retryResponse = await fetch(apiUrl, {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify({
+                  inputs: fullPrompt,
+                  parameters: {
+                    num_inference_steps: 30,
+                    guidance_scale: 7.5,
+                  },
+                }),
+                signal: retryController.signal,
+              });
+              
+              clearTimeout(retryTimeout);
+              
+              if (retryResponse.ok) {
+                const contentType = retryResponse.headers.get('content-type');
+                if (contentType && contentType.startsWith('image/')) {
+                  const imageBuffer = await retryResponse.arrayBuffer();
+                  const imageBase64 = Buffer.from(imageBuffer).toString('base64');
+                  console.log('[Image Generation] Image generated successfully on retry, size:', imageBuffer.byteLength);
+                  
+                  return res.json({
+                    success: true,
+                    imageData: imageBase64,
+                    mimeType: contentType || 'image/png',
+                  });
+                }
+              } else if (retryResponse.status === 503) {
+                console.log(`[Image Generation] Still loading (503) after attempt ${attempt}`);
+                continue; // Try again
+              } else {
+                const retryErrorText = await retryResponse.text();
+                console.error('[Image Generation] Retry failed:', retryResponse.status, retryErrorText.substring(0, 200));
+                break; // Different error, stop retrying
+              }
+            } catch (retryErr) {
+              clearTimeout(retryTimeout);
+              if (retryErr.name === 'AbortError') {
+                console.error(`[Image Generation] Retry ${attempt} timed out`);
+              } else {
+                console.error(`[Image Generation] Retry ${attempt} error:`, retryErr.message);
+                break;
+              }
+            }
           }
           
-          // Use retry response
-          const imageBuffer = await retryResponse.arrayBuffer();
-          const imageBase64 = Buffer.from(imageBuffer).toString('base64');
-          
-          console.log('[Image Generation] Image generated successfully on retry, size:', imageBuffer.byteLength);
-          
-          return res.json({
-            success: true,
-            imageData: imageBase64,
-            mimeType: 'image/png',
+          return res.status(503).json({ 
+            error: 'Image generation service is loading the model. This can take 1-2 minutes. Please try again in a moment.',
+            fallback: true 
           });
         }
         
