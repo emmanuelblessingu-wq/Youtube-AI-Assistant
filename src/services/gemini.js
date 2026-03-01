@@ -3,8 +3,9 @@ import { CSV_TOOL_DECLARATIONS, YOUTUBE_TOOL_DECLARATIONS } from './csvTools';
 
 const genAI = new GoogleGenerativeAI(process.env.REACT_APP_GEMINI_API_KEY || '');
 
-// Use the most stable, widely available model
-const MODEL = 'gemini-pro';
+// Try different model names - the API version might require specific naming
+// Common working models: gemini-1.5-flash-latest, gemini-1.5-pro-latest, models/gemini-pro
+const MODEL = 'gemini-1.5-flash-latest';
 
 const SEARCH_TOOL = { googleSearch: {} };
 const CODE_EXEC_TOOL = { codeExecution: {} };
@@ -35,13 +36,20 @@ async function loadSystemPrompt() {
 //                   false (default) to use googleSearch tool.
 // Note: Gemini does not support both tools simultaneously.
 export const streamChat = async function* (history, newMessage, imageParts = [], useCodeExecution = false, userFullName = '') {
+  // Check if API key is set
+  if (!process.env.REACT_APP_GEMINI_API_KEY) {
+    throw new Error('Gemini API key is not configured. Please set REACT_APP_GEMINI_API_KEY in your environment variables.');
+  }
+
   let systemInstruction = await loadSystemPrompt();
   if (userFullName) systemInstruction += `\n\nThe user's full name is ${userFullName}. Address them by their first name in your first response of each conversation.`;
   const tools = useCodeExecution ? [CODE_EXEC_TOOL] : [SEARCH_TOOL];
-  const model = genAI.getGenerativeModel({
-    model: MODEL,
-    tools,
-  });
+  
+  try {
+    const model = genAI.getGenerativeModel({
+      model: MODEL,
+      tools,
+    });
 
   const baseHistory = history.map((m) => ({
     role: m.role === 'user' ? 'user' : 'model',
@@ -59,16 +67,16 @@ export const streamChat = async function* (history, newMessage, imageParts = [],
       ]
     : baseHistory;
 
-  const chat = model.startChat({ history: chatHistory });
+    const chat = model.startChat({ history: chatHistory });
 
-  const parts = [
-    { text: newMessage },
-    ...imageParts.map((img) => ({
-      inlineData: { mimeType: img.mimeType || 'image/png', data: img.data },
-    })),
-  ].filter((p) => p.text !== undefined || p.inlineData !== undefined);
+    const parts = [
+      { text: newMessage },
+      ...imageParts.map((img) => ({
+        inlineData: { mimeType: img.mimeType || 'image/png', data: img.data },
+      })),
+    ].filter((p) => p.text !== undefined || p.inlineData !== undefined);
 
-  const result = await chat.sendMessageStream(parts);
+    const result = await chat.sendMessageStream(parts);
 
   // Stream text chunks for live display
   for await (const chunk of result.stream) {
@@ -115,11 +123,19 @@ export const streamChat = async function* (history, newMessage, imageParts = [],
     yield { type: 'fullResponse', parts: structuredParts };
   }
 
-  // Grounding metadata (search sources)
-  const grounding = response.candidates?.[0]?.groundingMetadata;
-  if (grounding) {
-    console.log('[Search grounding]', grounding);
-    yield { type: 'grounding', data: grounding };
+    // Grounding metadata (search sources)
+    const grounding = response.candidates?.[0]?.groundingMetadata;
+    if (grounding) {
+      console.log('[Search grounding]', grounding);
+      yield { type: 'grounding', data: grounding };
+    }
+  } catch (error) {
+    console.error('[Gemini API Error]', error);
+    // Provide a more helpful error message
+    if (error.message?.includes('404') || error.message?.includes('not found')) {
+      throw new Error(`Gemini model "${MODEL}" is not available. This might be due to:\n1. Invalid or missing API key\n2. Model not available in your region\n3. API key doesn't have access to this model\n\nPlease check your REACT_APP_GEMINI_API_KEY in Render dashboard.`);
+    }
+    throw error;
   }
 };
 
