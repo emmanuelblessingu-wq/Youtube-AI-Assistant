@@ -149,7 +149,19 @@ function GenerateImageCard({ chart }) {
           }),
         });
 
-        const data = await response.json();
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        let data;
+        
+        if (contentType && contentType.includes('application/json')) {
+          data = await response.json();
+        } else {
+          // If not JSON, read as text to see what we got
+          const text = await response.text();
+          console.error('[GenerateImage] Non-JSON response:', text.substring(0, 200));
+          throw new Error(`Server returned non-JSON response (${response.status}): ${text.substring(0, 100)}`);
+        }
+        
         if (data.success && data.imageData) {
           const mimeType = data.mimeType || 'image/png';
           const base64Data = data.imageData;
@@ -160,7 +172,12 @@ function GenerateImageCard({ chart }) {
         }
       } catch (err) {
         console.error('[GenerateImage] Error:', err);
-        setError(err.message || 'Failed to generate image');
+        // Clean up error message - remove HTML if present
+        let errorMsg = err.message || 'Failed to generate image';
+        if (errorMsg.includes('<!DOCTYPE') || errorMsg.includes('<html')) {
+          errorMsg = 'Image generation service error. Please check your Hugging Face API token in .env file.';
+        }
+        setError(errorMsg);
         setLoading(false);
       }
     };

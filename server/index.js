@@ -246,19 +246,24 @@ app.post('/api/generate-image', async (req, res) => {
     
     console.log('[Image Generation] Generating image for prompt:', fullPrompt);
     
-    // Use Hugging Face Stable Diffusion API via router endpoint
-    // Model: runwayml/stable-diffusion-v1-5 or stabilityai/stable-diffusion-2-1
+    // Use Hugging Face Inference API
+    // Model: runwayml/stable-diffusion-v1-5
     const model = 'runwayml/stable-diffusion-v1-5';
-    // Use router endpoint (replaces deprecated api-inference endpoint)
-    const apiUrl = `https://router.huggingface.co/models/${model}`;
+    // Try inference API endpoint first (more reliable)
+    const apiUrl = `https://api-inference.huggingface.co/models/${model}`;
     
-    // Optional: Add Hugging Face token if you have one (for higher rate limits)
+    // Hugging Face token - now required for most models
     const hfToken = process.env.HUGGINGFACE_API_TOKEN || '';
     const headers = {
       'Content-Type': 'application/json',
     };
-    if (hfToken) {
+    
+    if (hfToken && hfToken.trim() !== '') {
       headers['Authorization'] = `Bearer ${hfToken}`;
+      console.log('[Image Generation] Using Hugging Face API token');
+    } else {
+      console.warn('[Image Generation] No HUGGINGFACE_API_TOKEN found. Some models may require authentication.');
+      // Some models work without token, but most require it now
     }
     
     console.log('[Image Generation] Calling Hugging Face API...');
@@ -335,7 +340,28 @@ app.post('/api/generate-image', async (req, res) => {
           });
         }
         
-        throw new Error(`Image generation API error: ${hfResponse.status} - ${errorText}`);
+        // Unauthorized (401) - likely missing or invalid API token
+        if (hfResponse.status === 401) {
+          console.error('[Image Generation] 401 Unauthorized - Hugging Face API token may be missing or invalid');
+          return res.status(401).json({ 
+            error: 'Image generation service requires authentication. Please set HUGGINGFACE_API_TOKEN in your .env file. Get a free token at https://huggingface.co/settings/tokens',
+            fallback: true 
+          });
+        }
+        
+        // Extract just the error message from HTML if it's an HTML response
+        let errorMessage = errorText;
+        if (errorText.includes('<!DOCTYPE html>') || errorText.includes('<html')) {
+          // Try to extract meaningful error from HTML
+          const match = errorText.match(/<h1>(\d+)<\/h1>[\s\S]*?<p>([^<]+)<\/p>/);
+          if (match) {
+            errorMessage = `${match[1]}: ${match[2]}`;
+          } else {
+            errorMessage = `API returned HTML error page (status ${hfResponse.status})`;
+          }
+        }
+        
+        throw new Error(`Image generation API error: ${hfResponse.status} - ${errorMessage.substring(0, 200)}`);
       }
       
       // Check if response is actually an image

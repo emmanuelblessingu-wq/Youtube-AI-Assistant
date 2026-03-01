@@ -18,7 +18,7 @@ Create a `.env` file in the project root with:
 | `REACT_APP_GEMINI_API_KEY` | Yes | Frontend (baked in at build) | Google Gemini API key. Get one at [Google AI Studio](https://aistudio.google.com/apikey). |
 | `REACT_APP_MONGODB_URI` | Yes | Backend | MongoDB Atlas connection string. Format: `mongodb+srv://USER:PASSWORD@CLUSTER.mongodb.net/` |
 | `REACT_APP_API_URL` | Production only | Frontend (baked in at build) | Full URL of the backend, e.g. `https://your-backend.onrender.com`. Leave blank for local dev (proxy handles it). |
-| `HUGGINGFACE_API_TOKEN` | Optional | Backend | Hugging Face API token for image generation (optional, but recommended for higher rate limits). Get one at [Hugging Face](https://huggingface.co/settings/tokens). |
+| `HUGGINGFACE_API_TOKEN` | **Required for image generation** | Backend | Hugging Face API token for image generation. **Required** - most models now require authentication. Get a free token at [Hugging Face](https://huggingface.co/settings/tokens). Create a token with "Read" permissions. |
 
 The backend also accepts `MONGODB_URI` or `REACT_APP_MONGO_URI` as the MongoDB connection string if you prefer those names.
 
