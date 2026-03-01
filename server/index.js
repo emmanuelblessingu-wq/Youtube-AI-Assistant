@@ -277,30 +277,41 @@ app.post('/api/generate-image', async (req, res) => {
     }
     
     console.log('[Image Generation] Calling Hugging Face API...');
+    console.log('[Image Generation] URL:', apiUrl);
+    console.log('[Image Generation] Model:', model);
+    console.log('[Image Generation] Prompt:', fullPrompt.substring(0, 100));
     
     // Add timeout to prevent hanging (60 seconds for image generation)
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 60000);
     
     try {
+      const requestBody = {
+        inputs: fullPrompt,
+        parameters: {
+          num_inference_steps: 30,
+          guidance_scale: 7.5,
+        },
+      };
+      
+      console.log('[Image Generation] Request body:', JSON.stringify(requestBody).substring(0, 200));
+      
       const hfResponse = await fetch(apiUrl, {
         method: 'POST',
         headers: headers,
-        body: JSON.stringify({
-          inputs: fullPrompt,
-          parameters: {
-            num_inference_steps: 30,
-            guidance_scale: 7.5,
-          },
-        }),
+        body: JSON.stringify(requestBody),
         signal: controller.signal,
       });
       
       clearTimeout(timeoutId);
       
+      console.log('[Image Generation] Response status:', hfResponse.status);
+      console.log('[Image Generation] Response headers:', Object.fromEntries(hfResponse.headers.entries()));
+      
       if (!hfResponse.ok) {
         const errorText = await hfResponse.text();
-        console.error('[Image Generation] Hugging Face API error:', hfResponse.status, errorText);
+        console.error('[Image Generation] Hugging Face API error:', hfResponse.status);
+        console.error('[Image Generation] Error response (first 500 chars):', errorText.substring(0, 500));
         
         // If model is loading (503), wait a bit and retry once
         if (hfResponse.status === 503) {

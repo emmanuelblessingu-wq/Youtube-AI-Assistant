@@ -172,6 +172,11 @@ function GenerateImageCard({ chart }) {
         }
       } catch (err) {
         console.error('[GenerateImage] Error:', err);
+        console.error('[GenerateImage] Error details:', {
+          message: err.message,
+          stack: err.stack,
+          name: err.name
+        });
         // Clean up error message - remove HTML if present
         let errorMsg = err.message || 'Failed to generate image';
         if (errorMsg.includes('<!DOCTYPE') || errorMsg.includes('<html')) {
