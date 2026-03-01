@@ -25,7 +25,7 @@
   "scripts": {
     "start": "concurrently \"npm run server\" \"npm run client\"",
     "server": "node server/index.js",
-    "client": "react-scripts start",
+    "client": "WDS_SOCKET_HOST=localhost WDS_SOCKET_PORT=3000 react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
