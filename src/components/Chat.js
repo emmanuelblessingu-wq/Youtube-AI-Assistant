@@ -132,39 +132,43 @@ function StatsCard({ chart }) {
 function GenerateImageCard({ chart }) {
   const [imgSrc, setImgSrc] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState(false);
-  const [attempt, setAttempt] = React.useState(0);
-
-  const getUrl = React.useCallback((tryNum) => {
-    const rawPrompt = `${chart.prompt}${chart.style ? ', ' + chart.style + ' style' : ''}`;
-    const prompt = encodeURIComponent(rawPrompt);
-    const seed = Math.floor(Math.random() * 999999);
-    // Lexica Art API endpoints - using their image generation API
-    const urls = [
-      `https://image.lexica.art/full_jpg/${prompt}?seed=${seed}&width=512&height=512`,
-      `https://image.lexica.art/full_jpg/${prompt}?width=512&height=512`,
-      `https://lexica.art/api/v1/generate?prompt=${prompt}&width=512&height=512&seed=${seed}`,
-    ];
-    return urls[Math.min(tryNum, urls.length - 1)];
-  }, [chart.prompt, chart.style]);
+  const [error, setError] = React.useState(null);
 
   React.useEffect(() => {
-    setImgSrc(getUrl(0));
-    setLoading(true);
-    setError(false);
-    setAttempt(0);
-  }, [chart.prompt, chart.style]);
+    const generateImage = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const apiUrl = process.env.REACT_APP_API_URL || '';
+        const response = await fetch(`${apiUrl}/api/generate-image`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: chart.prompt,
+            style: chart.style || 'realistic',
+          }),
+        });
 
-  const handleError = () => {
-    if (attempt < 2) {
-      const next = attempt + 1;
-      setAttempt(next);
-      setImgSrc(getUrl(next));
-    } else {
-      setLoading(false);
-      setError(true);
+        const data = await response.json();
+        if (data.success && data.imageData) {
+          const mimeType = data.mimeType || 'image/png';
+          const base64Data = data.imageData;
+          setImgSrc(`data:${mimeType};base64,${base64Data}`);
+          setLoading(false);
+        } else {
+          throw new Error(data.error || 'Failed to generate image');
+        }
+      } catch (err) {
+        console.error('[GenerateImage] Error:', err);
+        setError(err.message || 'Failed to generate image');
+        setLoading(false);
+      }
+    };
+
+    if (chart?.prompt) {
+      generateImage();
     }
-  };
+  }, [chart?.prompt, chart?.style]);
 
   return (
     <div className="yt-genimage-card">
@@ -173,26 +177,15 @@ function GenerateImageCard({ chart }) {
       {loading && !error && (
         <div className="yt-genimage-loading">Generating image… (this may take 10-20 seconds)</div>
       )}
-      {imgSrc && (
+      {loading && <div className="yt-genimage-loading">Generating image…</div>}
+      {error && <p className="yt-genimage-error" style={{color:'#f87171',marginTop:'0.5rem'}}>{error}</p>}
+      {imgSrc && !loading && (
         <img
           src={imgSrc}
           alt={chart.prompt}
           className="yt-genimage-img"
-          onLoad={() => setLoading(false)}
-          onError={handleError}
-          style={{ display: loading ? 'none' : 'block' }}
-          referrerPolicy="no-referrer"
-          crossOrigin="anonymous"
+          style={{ maxWidth: '100%', borderRadius: '8px', marginTop: '0.5rem' }}
         />
-      )}
-      {error && (
-        <div>
-          <p className="yt-genimage-note">Image generation timed out. Try asking again.</p>
-          <button onClick={() => { setImgSrc(getUrl(0)); setLoading(true); setError(false); setAttempt(0); }}
-            style={{marginTop:'0.5rem',padding:'0.4rem 1rem',borderRadius:'6px',background:'#7c3aed',color:'white',border:'none',cursor:'pointer'}}>
-            Retry
-          </button>
-        </div>
       )}
     </div>
   );
