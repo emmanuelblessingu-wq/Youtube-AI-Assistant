@@ -76,6 +76,6 @@ npm run client
 
 Make sure your `.env` file has:
 ```
-REACT_APP_GEMINI_API_KEY=AIzaSyCIUw9mSg6DTrqBwSUrDfvMrb1K5f4wXdc
+REACT_APP_GEMINI_API_KEY=YOUR_NEW_API_KEY_HERE
 REACT_APP_MONGODB_URI=your_mongodb_connection_string
 ```
