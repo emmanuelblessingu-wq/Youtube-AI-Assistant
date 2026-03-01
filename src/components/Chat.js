@@ -135,8 +135,16 @@ function GenerateImageCard({ chart }) {
   const [error, setError] = React.useState(false);
 
   React.useEffect(() => {
-    const prompt = encodeURIComponent(`${chart.prompt}${chart.style ? ', ' + chart.style + ' style' : ''}`);
-    const url = `https://image.pollinations.ai/prompt/${prompt}?width=512&height=512&nologo=true`;
+    if (!chart.prompt) return;
+    
+    const fullPrompt = chart.style 
+      ? `${chart.prompt}, ${chart.style} style`
+      : chart.prompt;
+    
+    const encodedPrompt = encodeURIComponent(fullPrompt);
+    const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true&seed=${Date.now()}`;
+    
+    console.log('[GenerateImageCard] Setting image URL:', url);
     setImgSrc(url);
     setLoading(true);
     setError(false);
@@ -165,10 +173,15 @@ function GenerateImageCard({ chart }) {
 }
 
 function YoutubeToolOutput({ chart }) {
+  console.log('[YoutubeToolOutput] Rendering chart with _toolType:', chart._toolType, 'chart:', chart);
   if (chart._toolType === 'chart') return <MetricChart chart={chart} />;
   if (chart._toolType === 'videoCard') return <VideoCard chart={chart} />;
   if (chart._toolType === 'stats') return <StatsCard chart={chart} />;
-  if (chart._toolType === 'generateImage') return <GenerateImageCard chart={chart} />;
+  if (chart._toolType === 'generateImage') {
+    console.log('[YoutubeToolOutput] Rendering GenerateImageCard with prompt:', chart.prompt);
+    return <GenerateImageCard chart={chart} />;
+  }
+  console.warn('[YoutubeToolOutput] Unknown tool type:', chart._toolType);
   return null;
 }
 
@@ -648,6 +661,7 @@ ${sessionSummary}${slimCsvBlock}
         fullContent = answer;
         toolCharts = returnedCharts || [];
         toolCalls = returnedCalls || [];
+        console.log('[Chat] YouTube tools - returnedCharts:', toolCharts.length, 'charts:', toolCharts.map(c => ({ type: c._toolType, prompt: c.prompt })));
         setMessages((m) =>
           m.map((msg) =>
             msg.id === assistantId
