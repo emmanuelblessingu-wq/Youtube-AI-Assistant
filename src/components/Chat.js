@@ -142,7 +142,11 @@ function GenerateImageCard({ chart }) {
         setError(null);
         console.log('[GenerateImage] Starting generation for prompt:', chart.prompt);
         
-        const response = await fetch('/api/generate-image', {
+        // Use REACT_APP_API_URL in production, or relative path in development
+        const apiUrl = process.env.REACT_APP_API_URL || '';
+        const url = `${apiUrl}/api/generate-image`;
+        
+        const response = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -154,11 +158,30 @@ function GenerateImageCard({ chart }) {
         if (!response.ok) {
           const errorText = await response.text();
           console.error('[GenerateImage] API error:', response.status, errorText);
-          setError(`API error: ${response.status}`);
+          setError(`API error: ${response.status} - ${errorText || 'Unknown error'}`);
           return;
         }
 
-        const data = await response.json();
+        // Get response as text first to handle potential parsing issues
+        const responseText = await response.text();
+        console.log('[GenerateImage] Raw response length:', responseText.length);
+        
+        if (!responseText || responseText.trim() === '') {
+          console.error('[GenerateImage] Empty response');
+          setError('Empty response from server');
+          return;
+        }
+
+        let data;
+        try {
+          data = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error('[GenerateImage] JSON parse error:', parseError);
+          console.error('[GenerateImage] Response text:', responseText.substring(0, 200));
+          setError(`Failed to parse response: ${parseError.message}`);
+          return;
+        }
+        
         console.log('[GenerateImage] Response:', { success: data.success, hasImageData: !!data.imageData });
         
         if (data.success && data.imageData) {
