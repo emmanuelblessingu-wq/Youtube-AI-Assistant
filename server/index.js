@@ -13,6 +13,12 @@ app.use(express.json({ limit: '10mb' }));
 // Debug: log what env vars were loaded
 if (dotenvResult.parsed) {
   console.log('[DEBUG] Loaded env vars:', Object.keys(dotenvResult.parsed).join(', '));
+  // Check if Hugging Face token is loaded
+  if (process.env.HUGGINGFACE_API_TOKEN) {
+    console.log('[DEBUG] ✅ HUGGINGFACE_API_TOKEN is loaded (length:', process.env.HUGGINGFACE_API_TOKEN.length, ')');
+  } else {
+    console.log('[DEBUG] ⚠️  HUGGINGFACE_API_TOKEN is NOT loaded');
+  }
 }
 
 const URI = process.env.REACT_APP_MONGODB_URI || process.env.MONGODB_URI || process.env.REACT_APP_MONGO_URI || process.env.mongodb_uri;
@@ -260,10 +266,14 @@ app.post('/api/generate-image', async (req, res) => {
     
     if (hfToken && hfToken.trim() !== '') {
       headers['Authorization'] = `Bearer ${hfToken}`;
-      console.log('[Image Generation] Using Hugging Face API token');
+      console.log('[Image Generation] Using Hugging Face API token (length:', hfToken.length, ')');
     } else {
-      console.warn('[Image Generation] No HUGGINGFACE_API_TOKEN found. Some models may require authentication.');
-      // Some models work without token, but most require it now
+      console.error('[Image Generation] ❌ No HUGGINGFACE_API_TOKEN found in environment variables!');
+      console.error('[Image Generation] Please add HUGGINGFACE_API_TOKEN to your .env file and restart the server.');
+      return res.status(500).json({ 
+        error: 'Hugging Face API token is missing. Please set HUGGINGFACE_API_TOKEN in your .env file and restart the backend server.',
+        fallback: true 
+      });
     }
     
     console.log('[Image Generation] Calling Hugging Face API...');
