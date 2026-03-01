@@ -520,9 +520,30 @@ export default function Chat({ username, firstName, lastName, onLogout }) {
     setDragOver(false);
     const files = [...e.dataTransfer.files];
 
-    const jsonFiles = files.filter((f) => f.name.endsWith('.json') || f.type === 'application/json');
-    const csvFiles = files.filter((f) => f.name.endsWith('.csv') || f.type === 'text/csv');
-    const imageFiles = files.filter((f) => f.type.startsWith('image/'));
+    // Filter files by type - be strict about image detection
+    const jsonFiles = files.filter((f) => 
+      f.name.toLowerCase().endsWith('.json') || 
+      f.type === 'application/json' ||
+      f.type === 'text/json'
+    );
+    const csvFiles = files.filter((f) => 
+      f.name.toLowerCase().endsWith('.csv') || 
+      f.type === 'text/csv' ||
+      f.type === 'application/csv'
+    );
+    // Only accept files that explicitly have image/ MIME type
+    const imageFiles = files.filter((f) => 
+      f.type && f.type.startsWith('image/') && 
+      !f.name.toLowerCase().endsWith('.json') && 
+      !f.name.toLowerCase().endsWith('.csv')
+    );
+    
+    // Log unrecognized files for debugging
+    const recognizedFiles = [...jsonFiles, ...csvFiles, ...imageFiles];
+    const unrecognized = files.filter(f => !recognizedFiles.includes(f));
+    if (unrecognized.length > 0) {
+      console.warn('[File Upload] Unrecognized file types:', unrecognized.map(f => ({ name: f.name, type: f.type })));
+    }
 
     if (jsonFiles.length > 0) {
       const text = await fileToText(jsonFiles[0]);
@@ -572,9 +593,30 @@ export default function Chat({ username, firstName, lastName, onLogout }) {
     const files = [...e.target.files];
     e.target.value = '';
 
-    const jsonFiles = files.filter((f) => f.name.endsWith('.json') || f.type === 'application/json');
-    const csvFiles = files.filter((f) => f.name.endsWith('.csv') || f.type === 'text/csv');
-    const imageFiles = files.filter((f) => f.type.startsWith('image/'));
+    // Filter files by type - be strict about image detection
+    const jsonFiles = files.filter((f) => 
+      f.name.toLowerCase().endsWith('.json') || 
+      f.type === 'application/json' ||
+      f.type === 'text/json'
+    );
+    const csvFiles = files.filter((f) => 
+      f.name.toLowerCase().endsWith('.csv') || 
+      f.type === 'text/csv' ||
+      f.type === 'application/csv'
+    );
+    // Only accept files that explicitly have image/ MIME type
+    const imageFiles = files.filter((f) => 
+      f.type && f.type.startsWith('image/') && 
+      !f.name.toLowerCase().endsWith('.json') && 
+      !f.name.toLowerCase().endsWith('.csv')
+    );
+    
+    // Log unrecognized files for debugging
+    const recognizedFiles = [...jsonFiles, ...csvFiles, ...imageFiles];
+    const unrecognized = files.filter(f => !recognizedFiles.includes(f));
+    if (unrecognized.length > 0) {
+      console.warn('[File Upload] Unrecognized file types:', unrecognized.map(f => ({ name: f.name, type: f.type })));
+    }
 
     if (jsonFiles.length > 0) {
       const text = await fileToText(jsonFiles[0]);
@@ -742,10 +784,19 @@ ${sessionSummary}${slimCsvBlock}
     setCsvContext(null);
     setStreaming(true);
 
-    // Store display text only — base64 is never persisted
-    await saveMessage(sessionId, 'user', userContent, capturedImages.length ? capturedImages : null);
+    // Validate images before sending - only send actual image files
+    const validImages = capturedImages.filter((img) => {
+      const isValid = img.mimeType && img.mimeType.startsWith('image/');
+      if (!isValid) {
+        console.warn('[Chat] Filtered out non-image file:', { mimeType: img.mimeType, name: img.name });
+      }
+      return isValid;
+    });
 
-    const imageParts = capturedImages.map((img) => ({ mimeType: img.mimeType, data: img.data }));
+    // Store display text only — base64 is never persisted
+    await saveMessage(sessionId, 'user', userContent, validImages.length ? validImages : null);
+
+    const imageParts = validImages.map((img) => ({ mimeType: img.mimeType, data: img.data }));
 
     // History: plain display text only — session summary handles CSV context on every message
     const history = messages
@@ -1108,7 +1159,7 @@ ${sessionSummary}${slimCsvBlock}
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*,.csv,text/csv"
+            accept="image/*,.csv,text/csv,.json,application/json"
             multiple
             style={{ display: 'none' }}
             onChange={handleFileSelect}
