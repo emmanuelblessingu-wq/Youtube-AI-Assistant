@@ -149,10 +149,10 @@ function GenerateImageCard({ chart }) {
     
     // Pollinations AI URL - generates images on the fly
     // Try without CORS first (works better for direct image display)
-    const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true&enhance=true&seed=${Date.now()}`;
+    const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true&seed=${Date.now()}`;
     
     console.log('[GenerateImage] Using Pollinations AI for prompt:', cleanPrompt);
-    setImgSrc(pollinationsUrl);
+    setImgSrc(url);
     setLoading(true);
     setError(null);
 
@@ -215,7 +215,7 @@ function GenerateImageCard({ chart }) {
       img.src = url;
     };
 
-    tryLoadImage(pollinationsUrl, false);
+    tryLoadImage(url, false);
 
     return () => {
       timeoutCleared = true;
