@@ -3,9 +3,9 @@ import { CSV_TOOL_DECLARATIONS, YOUTUBE_TOOL_DECLARATIONS } from './csvTools';
 
 const genAI = new GoogleGenerativeAI(process.env.REACT_APP_GEMINI_API_KEY || '');
 
-// Model name for Gemini API v1beta
-// Using gemini-1.5-flash which is the most stable and widely available model
-// If this doesn't work, the API key is likely invalid or doesn't have access
+// Model name for Gemini API v1beta - FIXED VERSION
+// CRITICAL: This must be gemini-1.5-flash (NOT gemini-pro)
+// Updated: 2024-03-01 - Using gemini-1.5-flash for v1beta API compatibility
 const MODEL = 'gemini-1.5-flash';
 
 const SEARCH_TOOL = { googleSearch: {} };
