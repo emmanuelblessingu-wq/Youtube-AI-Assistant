@@ -4,11 +4,10 @@ import { CSV_TOOL_DECLARATIONS, YOUTUBE_TOOL_DECLARATIONS } from './csvTools';
 const genAI = new GoogleGenerativeAI(process.env.REACT_APP_GEMINI_API_KEY || '');
 
 // Model name for Gemini API
-// CRITICAL: The SDK v0.24.1 uses v1beta API which has limited model support
-// The error says to "Call ListModels" - models available in v1beta might be different
-// Try the most basic model name format without suffixes
-// If this still fails, the API key may not have access to v1beta models
-const MODEL = 'gemini-1.5-flash';  // Basic name without -latest suffix
+// Based on ListModels API response, available models use "models/" prefix
+// Available: models/gemini-2.5-flash, models/gemini-2.5-pro, models/gemini-2.0-flash, models/gemini-flash-latest
+// Using models/gemini-2.5-flash (newest and most capable)
+const MODEL = 'models/gemini-2.5-flash';
 
 const SEARCH_TOOL = { googleSearch: {} };
 const CODE_EXEC_TOOL = { codeExecution: {} };
