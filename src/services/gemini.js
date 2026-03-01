@@ -172,6 +172,10 @@ export const streamChat = async function* (history, newMessage, imageParts = [],
       throw new Error('Gemini API Error: Unauthorized. Your API key is invalid or expired. Please get a new key from https://aistudio.google.com/apikey and update it in Render.');
     }
     
+    if (error.message?.includes('403') || error.message?.includes('leaked')) {
+      throw new Error('Gemini API Error: Your API key was reported as leaked. This happens when an API key is exposed publicly (e.g., in GitHub, screenshots, or shared code).\n\nYou MUST:\n1. Go to https://aistudio.google.com/apikey\n2. Delete the old leaked key\n3. Create a NEW API key\n4. Update it in your .env file (local) and Render dashboard (production)\n5. NEVER commit API keys to GitHub - they should be in .env (which is gitignored)');
+    }
+    
     throw error;
   }
 };
