@@ -261,51 +261,129 @@ app.post('/api/generate-image', async (req, res) => {
     }
     
     console.log('[Image Generation] Calling Hugging Face API...');
-    const hfResponse = await fetch(apiUrl, {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify({
-        inputs: fullPrompt,
-        parameters: {
-          num_inference_steps: 30,
-          guidance_scale: 7.5,
-        },
-      }),
-    });
     
-    if (!hfResponse.ok) {
-      const errorText = await hfResponse.text();
-      console.error('[Image Generation] Hugging Face API error:', hfResponse.status, errorText);
+    // Add timeout to prevent hanging (60 seconds for image generation)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
+    
+    try {
+      const hfResponse = await fetch(apiUrl, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({
+          inputs: fullPrompt,
+          parameters: {
+            num_inference_steps: 30,
+            guidance_scale: 7.5,
+          },
+        }),
+        signal: controller.signal,
+      });
       
-      // If rate limited or model loading, fall back to placeholder
-      if (hfResponse.status === 503 || hfResponse.status === 429) {
-        console.log('[Image Generation] API unavailable, using placeholder');
-        return generatePlaceholderImage(fullPrompt, res);
+      clearTimeout(timeoutId);
+      
+      if (!hfResponse.ok) {
+        const errorText = await hfResponse.text();
+        console.error('[Image Generation] Hugging Face API error:', hfResponse.status, errorText);
+        
+        // If model is loading (503), wait a bit and retry once
+        if (hfResponse.status === 503) {
+          console.log('[Image Generation] Model loading, waiting 5 seconds and retrying...');
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          
+          const retryResponse = await fetch(apiUrl, {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify({
+              inputs: fullPrompt,
+              parameters: {
+                num_inference_steps: 30,
+                guidance_scale: 7.5,
+              },
+            }),
+            signal: controller.signal,
+          });
+          
+          if (!retryResponse.ok) {
+            const retryErrorText = await retryResponse.text();
+            console.error('[Image Generation] Retry failed:', retryResponse.status, retryErrorText);
+            return res.status(503).json({ 
+              error: 'Image generation service is temporarily unavailable. Please try again in a moment.',
+              fallback: true 
+            });
+          }
+          
+          // Use retry response
+          const imageBuffer = await retryResponse.arrayBuffer();
+          const imageBase64 = Buffer.from(imageBuffer).toString('base64');
+          
+          console.log('[Image Generation] Image generated successfully on retry, size:', imageBuffer.byteLength);
+          
+          return res.json({
+            success: true,
+            imageData: imageBase64,
+            mimeType: 'image/png',
+          });
+        }
+        
+        // Rate limited
+        if (hfResponse.status === 429) {
+          return res.status(429).json({ 
+            error: 'Rate limit exceeded. Please try again in a moment.',
+            fallback: true 
+          });
+        }
+        
+        throw new Error(`Image generation API error: ${hfResponse.status} - ${errorText}`);
       }
       
-      throw new Error(`Image generation API error: ${hfResponse.status} - ${errorText}`);
+      // Check if response is actually an image
+      const contentType = hfResponse.headers.get('content-type');
+      if (!contentType || !contentType.startsWith('image/')) {
+        const responseText = await hfResponse.text();
+        console.error('[Image Generation] Unexpected response type:', contentType, responseText.substring(0, 200));
+        throw new Error('API returned non-image response');
+      }
+      
+      // Hugging Face returns the image as a blob
+      const imageBuffer = await hfResponse.arrayBuffer();
+      
+      if (imageBuffer.byteLength === 0) {
+        throw new Error('Received empty image from API');
+      }
+      
+      const imageBase64 = Buffer.from(imageBuffer).toString('base64');
+      
+      console.log('[Image Generation] Image generated successfully, size:', imageBuffer.byteLength);
+      
+      res.json({
+        success: true,
+        imageData: imageBase64,
+        mimeType: contentType || 'image/png',
+      });
+    } catch (fetchErr) {
+      clearTimeout(timeoutId);
+      
+      if (fetchErr.name === 'AbortError') {
+        console.error('[Image Generation] Request timeout after 60 seconds');
+        return res.status(504).json({ 
+          error: 'Image generation timed out. The service may be busy. Please try again.',
+          fallback: true 
+        });
+      }
+      
+      throw fetchErr;
     }
-    
-    // Hugging Face returns the image as a blob
-    const imageBuffer = await hfResponse.arrayBuffer();
-    const imageBase64 = Buffer.from(imageBuffer).toString('base64');
-    
-    console.log('[Image Generation] Image generated successfully, size:', imageBuffer.byteLength);
-    
-    res.json({
-      success: true,
-      imageData: imageBase64,
-      mimeType: 'image/png',
-    });
   } catch (err) {
-    console.error('[Image Generation] Error:', err);
+    console.error('[Image Generation] Error:', err.message, err.stack);
     
-    // Fallback to placeholder on error
-    try {
-      return generatePlaceholderImage(req.body.prompt || 'image', res);
-    } catch (fallbackErr) {
-      res.status(500).json({ error: err.message || 'Failed to generate image' });
-    }
+    // Return error to frontend instead of silently falling back
+    // Frontend can decide to show placeholder or error message
+    res.status(500).json({ 
+      error: err.message || 'Failed to generate image',
+      details: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+      fallback: true 
+    });
   }
 });
 

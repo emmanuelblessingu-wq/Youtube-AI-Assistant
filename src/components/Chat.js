@@ -155,16 +155,9 @@ function GenerateImageCard({ chart }) {
           }),
         });
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('[GenerateImage] API error:', response.status, errorText);
-          setError(`API error: ${response.status} - ${errorText || 'Unknown error'}`);
-          return;
-        }
-
         // Get response as text first to handle potential parsing issues
         const responseText = await response.text();
-        console.log('[GenerateImage] Raw response length:', responseText.length);
+        console.log('[GenerateImage] Response status:', response.status, 'Length:', responseText.length);
         
         if (!responseText || responseText.trim() === '') {
           console.error('[GenerateImage] Empty response');
@@ -182,7 +175,21 @@ function GenerateImageCard({ chart }) {
           return;
         }
         
-        console.log('[GenerateImage] Response:', { success: data.success, hasImageData: !!data.imageData });
+        console.log('[GenerateImage] Response:', { success: data.success, hasImageData: !!data.imageData, error: data.error, fallback: data.fallback });
+        
+        // If API returned an error with fallback flag, show placeholder
+        if (!response.ok || data.error) {
+          if (data.fallback) {
+            console.log('[GenerateImage] API error with fallback flag, showing placeholder');
+            // Generate placeholder SVG client-side
+            const placeholderSvg = generatePlaceholderSVG(chart.prompt);
+            setImageData({ data: placeholderSvg, mimeType: 'image/svg+xml' });
+            setError(`⚠️ ${data.error || 'Image generation unavailable'}. Showing placeholder.`);
+          } else {
+            setError(data.error || `API error: ${response.status}`);
+          }
+          return;
+        }
         
         if (data.success && data.imageData) {
           setImageData({ data: data.imageData, mimeType: data.mimeType });
@@ -210,26 +217,52 @@ function GenerateImageCard({ chart }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `generated-image-${Date.now()}.png`;
+    a.download = `generated-image-${Date.now()}.${imageData.mimeType === 'image/svg+xml' ? 'svg' : 'png'}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
 
+  // Helper to generate placeholder SVG
+  const generatePlaceholderSVG = (prompt) => {
+    const escapedPrompt = String(prompt).replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const lines = escapedPrompt.match(/.{1,35}/g) || [escapedPrompt];
+    let textElements = '';
+    const startY = 200;
+    const lineHeight = 30;
+    lines.forEach((line, i) => {
+      const y = startY + (i * lineHeight);
+      textElements += `<text x="256" y="${y}" font-family="Arial, sans-serif" font-size="18" fill="#ffffff" text-anchor="middle">${line}</text>`;
+    });
+    const svg = `<svg width="512" height="512" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+          <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+        </linearGradient>
+      </defs>
+      <rect width="512" height="512" fill="url(#grad)"/>
+      <text x="256" y="150" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#ffffff" text-anchor="middle">🎨 Generated Image</text>
+      ${textElements}
+      <text x="256" y="450" font-family="Arial, sans-serif" font-size="14" fill="rgba(255,255,255,0.7)" text-anchor="middle">Image generation placeholder</text>
+    </svg>`;
+    return btoa(unescape(encodeURIComponent(svg)));
+  };
+
   return (
     <div className="yt-genimage-card">
       <p className="yt-genimage-label">🎨 Generated Image</p>
       <p className="yt-genimage-prompt">Prompt: <em>{chart.prompt}</em></p>
-      
-      {loading && <p className="yt-genimage-note">Generating image...</p>}
-      {error && <p className="yt-genimage-error">Error: {error}</p>}
-      
+
+      {loading && <p className="yt-genimage-note">Generating image... (this may take 10-30 seconds)</p>}
+      {error && <p className="yt-genimage-error">{error}</p>}
+
       {imageData && (
         <>
           <div className="yt-genimage-preview" onClick={() => setEnlarged(true)}>
-            <img 
-              src={`data:${imageData.mimeType};base64,${imageData.data}`} 
+            <img
+              src={`data:${imageData.mimeType};base64,${imageData.data}`}
               alt={chart.prompt}
               style={{ maxWidth: '100%', borderRadius: '8px', cursor: 'pointer' }}
             />
@@ -248,8 +281,8 @@ function GenerateImageCard({ chart }) {
               <span>Generated Image</span>
               <button onClick={() => setEnlarged(false)} className="yt-chart-close">✕</button>
             </div>
-            <img 
-              src={`data:${imageData.mimeType};base64,${imageData.data}`} 
+            <img
+              src={`data:${imageData.mimeType};base64,${imageData.data}`}
               alt={chart.prompt}
               style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: '8px' }}
             />
@@ -264,15 +297,10 @@ function GenerateImageCard({ chart }) {
 }
 
 function YoutubeToolOutput({ chart }) {
-  console.log('[YoutubeToolOutput] Rendering chart with _toolType:', chart._toolType);
   if (chart._toolType === 'chart') return <MetricChart chart={chart} />;
   if (chart._toolType === 'videoCard') return <VideoCard chart={chart} />;
   if (chart._toolType === 'stats') return <StatsCard chart={chart} />;
-  if (chart._toolType === 'generateImage') {
-    console.log('[YoutubeToolOutput] Rendering GenerateImageCard with prompt:', chart.prompt);
-    return <GenerateImageCard chart={chart} />;
-  }
-  console.log('[YoutubeToolOutput] No matching tool type, returning null');
+  if (chart._toolType === 'generateImage') return <GenerateImageCard chart={chart} />;
   return null;
 }
 
@@ -1080,7 +1108,7 @@ ${sessionSummary}${slimCsvBlock}
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*,.csv,text/csv,.json,application/json"
+            accept="image/*,.csv,text/csv"
             multiple
             style={{ display: 'none' }}
             onChange={handleFileSelect}
