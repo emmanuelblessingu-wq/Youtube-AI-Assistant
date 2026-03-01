@@ -130,151 +130,129 @@ function StatsCard({ chart }) {
 }
 
 function GenerateImageCard({ chart }) {
-  const [imageData, setImageData] = useState(null);
+  const [imgSrc, setImgSrc] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [enlarged, setEnlarged] = useState(false);
 
   useEffect(() => {
-    const generateImage = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        console.log('[GenerateImage] Starting generation for prompt:', chart.prompt);
-        
-        // Use REACT_APP_API_URL in production, or relative path in development
-        const apiUrl = process.env.REACT_APP_API_URL || '';
-        const url = `${apiUrl}/api/generate-image`;
-        
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            prompt: chart.prompt,
-            style: chart.style || 'realistic',
-          }),
-        });
+    if (!chart.prompt) return;
 
-        // Get response as text first to handle potential parsing issues
-        const responseText = await response.text();
-        console.log('[GenerateImage] Response status:', response.status, 'Length:', responseText.length);
-        
-        if (!responseText || responseText.trim() === '') {
-          console.error('[GenerateImage] Empty response');
-          setError('Empty response from server');
-          return;
-        }
+    // Build prompt with style if provided
+    const fullPrompt = chart.style 
+      ? `${chart.prompt}, ${chart.style} style`
+      : chart.prompt;
+    
+    // Encode prompt for URL
+    const encodedPrompt = encodeURIComponent(fullPrompt);
+    
+    // Pollinations AI URL - generates images on the fly
+    const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true&enhance=true`;
+    
+    console.log('[GenerateImage] Using Pollinations AI for prompt:', fullPrompt);
+    setImgSrc(pollinationsUrl);
+    setLoading(true);
+    setError(null);
 
-        let data;
-        try {
-          data = JSON.parse(responseText);
-        } catch (parseError) {
-          console.error('[GenerateImage] JSON parse error:', parseError);
-          console.error('[GenerateImage] Response text:', responseText.substring(0, 200));
-          setError(`Failed to parse response: ${parseError.message}`);
-          return;
-        }
-        
-        console.log('[GenerateImage] Response:', { success: data.success, hasImageData: !!data.imageData, error: data.error, fallback: data.fallback });
-        
-        // If API returned an error with fallback flag, show placeholder
-        if (!response.ok || data.error) {
-          if (data.fallback) {
-            console.log('[GenerateImage] API error with fallback flag, showing placeholder');
-            // Generate placeholder SVG client-side
-            const placeholderSvg = generatePlaceholderSVG(chart.prompt);
-            setImageData({ data: placeholderSvg, mimeType: 'image/svg+xml' });
-            setError(`⚠️ ${data.error || 'Image generation unavailable'}. Showing placeholder.`);
-          } else {
-            setError(data.error || `API error: ${response.status}`);
-          }
-          return;
-        }
-        
-        if (data.success && data.imageData) {
-          setImageData({ data: data.imageData, mimeType: data.mimeType });
-          console.log('[GenerateImage] Image data set successfully');
-        } else {
-          console.error('[GenerateImage] No image data in response:', data);
-          setError(data.error || 'Failed to generate image');
-        }
-      } catch (err) {
-        console.error('[GenerateImage] Exception:', err);
-        setError(err.message || 'Failed to generate image');
-      } finally {
-        setLoading(false);
-      }
+    // Create an image element to preload and check if it loads successfully
+    const img = new Image();
+    img.crossOrigin = 'anonymous'; // Enable CORS for downloading
+    
+    img.onload = () => {
+      console.log('[GenerateImage] Image loaded successfully');
+      setLoading(false);
+      setError(null);
+    };
+    
+    img.onerror = (err) => {
+      console.error('[GenerateImage] Failed to load image:', err);
+      setLoading(false);
+      setError('Failed to generate image. Please try again with a different prompt.');
     };
 
-    if (chart.prompt) {
-      generateImage();
-    }
+    // Set a timeout in case the image takes too long
+    let timeoutCleared = false;
+    const timeout = setTimeout(() => {
+      if (!timeoutCleared) {
+        console.warn('[GenerateImage] Image loading timeout');
+        setLoading(false);
+        // Don't set error on timeout - image might still load
+      }
+    }, 30000); // 30 second timeout
+
+    img.src = pollinationsUrl;
+
+    return () => {
+      timeoutCleared = true;
+      clearTimeout(timeout);
+    };
   }, [chart.prompt, chart.style]);
 
-  const handleDownload = () => {
-    if (!imageData) return;
-    const blob = new Blob([Uint8Array.from(atob(imageData.data), c => c.charCodeAt(0))], { type: imageData.mimeType });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `generated-image-${Date.now()}.${imageData.mimeType === 'image/svg+xml' ? 'svg' : 'png'}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  // Helper to generate placeholder SVG
-  const generatePlaceholderSVG = (prompt) => {
-    const escapedPrompt = String(prompt).replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const lines = escapedPrompt.match(/.{1,35}/g) || [escapedPrompt];
-    let textElements = '';
-    const startY = 200;
-    const lineHeight = 30;
-    lines.forEach((line, i) => {
-      const y = startY + (i * lineHeight);
-      textElements += `<text x="256" y="${y}" font-family="Arial, sans-serif" font-size="18" fill="#ffffff" text-anchor="middle">${line}</text>`;
-    });
-    const svg = `<svg width="512" height="512" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
-          <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
-        </linearGradient>
-      </defs>
-      <rect width="512" height="512" fill="url(#grad)"/>
-      <text x="256" y="150" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#ffffff" text-anchor="middle">🎨 Generated Image</text>
-      ${textElements}
-      <text x="256" y="450" font-family="Arial, sans-serif" font-size="14" fill="rgba(255,255,255,0.7)" text-anchor="middle">Image generation placeholder</text>
-    </svg>`;
-    return btoa(unescape(encodeURIComponent(svg)));
+  const handleDownload = async () => {
+    if (!imgSrc) return;
+    
+    try {
+      // Fetch the image with CORS
+      const response = await fetch(imgSrc, { mode: 'cors' });
+      if (!response.ok) throw new Error('Failed to fetch image');
+      
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `generated-image-${Date.now()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('[GenerateImage] Download error:', err);
+      // Fallback: open image in new tab for manual download
+      window.open(imgSrc, '_blank');
+    }
   };
 
   return (
     <div className="yt-genimage-card">
       <p className="yt-genimage-label">🎨 Generated Image</p>
       <p className="yt-genimage-prompt">Prompt: <em>{chart.prompt}</em></p>
+      {chart.style && <p className="yt-genimage-prompt" style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>Style: <em>{chart.style}</em></p>}
 
       {loading && <p className="yt-genimage-note">Generating image... (this may take 10-30 seconds)</p>}
       {error && <p className="yt-genimage-error">{error}</p>}
 
-      {imageData && (
+      {imgSrc && (
         <>
           <div className="yt-genimage-preview" onClick={() => setEnlarged(true)}>
             <img
-              src={`data:${imageData.mimeType};base64,${imageData.data}`}
+              src={imgSrc}
               alt={chart.prompt}
-              style={{ maxWidth: '100%', borderRadius: '8px', cursor: 'pointer' }}
+              className="yt-genimage-img"
+              onLoad={() => setLoading(false)}
+              onError={() => {
+                setLoading(false);
+                setError('Failed to load generated image. Please try again.');
+              }}
+              style={{ 
+                display: loading ? 'none' : 'block',
+                maxWidth: '100%', 
+                borderRadius: '8px', 
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+              }}
+              crossOrigin="anonymous"
             />
           </div>
-          <div className="yt-genimage-actions">
-            <button onClick={handleDownload} className="yt-genimage-download">💾 Download</button>
-            <button onClick={() => setEnlarged(true)} className="yt-genimage-enlarge">🔍 Enlarge</button>
-          </div>
+          {!loading && !error && (
+            <div className="yt-genimage-actions">
+              <button onClick={handleDownload} className="yt-genimage-download">💾 Download</button>
+              <button onClick={() => setEnlarged(true)} className="yt-genimage-enlarge">🔍 Enlarge</button>
+            </div>
+          )}
         </>
       )}
 
-      {enlarged && imageData && (
+      {enlarged && imgSrc && !loading && (
         <div className="yt-chart-overlay" onClick={() => setEnlarged(false)}>
           <div className="yt-chart-modal" onClick={(e) => e.stopPropagation()}>
             <div className="yt-chart-modal-header">
@@ -282,9 +260,10 @@ function GenerateImageCard({ chart }) {
               <button onClick={() => setEnlarged(false)} className="yt-chart-close">✕</button>
             </div>
             <img
-              src={`data:${imageData.mimeType};base64,${imageData.data}`}
+              src={imgSrc}
               alt={chart.prompt}
               style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: '8px' }}
+              crossOrigin="anonymous"
             />
             <div style={{ padding: '1rem', textAlign: 'center' }}>
               <button onClick={handleDownload} className="yt-genimage-download">💾 Download Image</button>
