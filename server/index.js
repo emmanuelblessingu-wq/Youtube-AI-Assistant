@@ -254,7 +254,7 @@ app.post('/api/generate-image', async (req, res) => {
     const fullPrompt = style ? `${prompt}, ${style} style` : prompt;
     console.log('[Image Generation] Generating image for prompt:', fullPrompt);
     
-    // Generate a beautiful SVG image - works immediately, no dependencies!
+    // Generate a beautiful SVG image - works immediately, no external APIs needed!
     const colors = [
       { start: '#667eea', end: '#764ba2' }, // Purple
       { start: '#f093fb', end: '#f5576c' }, // Pink
@@ -299,8 +299,6 @@ app.post('/api/generate-image', async (req, res) => {
       imageData: imageBase64,
       mimeType: 'image/svg+xml',
     });
-    
-    // Use Hugging Face Inference API
     // Model: runwayml/stable-diffusion-v1-5
     // Note: Some models may need to be loaded first (503), which can take 30-60 seconds
     const model = 'runwayml/stable-diffusion-v1-5';
