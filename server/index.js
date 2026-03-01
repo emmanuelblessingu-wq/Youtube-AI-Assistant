@@ -249,7 +249,7 @@ app.post('/api/generate-image', async (req, res) => {
     // Use Hugging Face Stable Diffusion API (free tier, no auth required for basic use)
     // Model: runwayml/stable-diffusion-v1-5 or stabilityai/stable-diffusion-2-1
     const model = 'runwayml/stable-diffusion-v1-5';
-    const apiUrl = `https://api-inference.huggingface.co/models/${model}`;
+    const apiUrl = `https://router.huggingface.co/models/${model}`;
     
     // Optional: Add Hugging Face token if you have one (for higher rate limits)
     const hfToken = process.env.HUGGINGFACE_API_TOKEN || '';
