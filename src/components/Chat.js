@@ -784,14 +784,51 @@ ${sessionSummary}${slimCsvBlock}
     setCsvContext(null);
     setStreaming(true);
 
-    // Validate images before sending - only send actual image files
+    // Validate images before sending - only send actual image files with valid data
     const validImages = capturedImages.filter((img) => {
-      const isValid = img.mimeType && img.mimeType.startsWith('image/');
-      if (!isValid) {
+      // Check MIME type
+      if (!img.mimeType || !img.mimeType.startsWith('image/')) {
         console.warn('[Chat] Filtered out non-image file:', { mimeType: img.mimeType, name: img.name });
+        return false;
       }
-      return isValid;
+      
+      // Check if data exists and is not empty
+      if (!img.data || typeof img.data !== 'string' || img.data.trim() === '') {
+        console.warn('[Chat] Filtered out image with empty data:', { mimeType: img.mimeType, name: img.name });
+        return false;
+      }
+      
+      // Validate base64 format (basic check)
+      const base64Regex = /^[A-Za-z0-9+/=]+$/;
+      if (!base64Regex.test(img.data)) {
+        console.warn('[Chat] Filtered out image with invalid base64:', { mimeType: img.mimeType, name: img.name });
+        return false;
+      }
+      
+      // Check supported MIME types for Gemini
+      const supportedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif'];
+      if (!supportedTypes.includes(img.mimeType.toLowerCase())) {
+        console.warn('[Chat] Filtered out unsupported image type:', { mimeType: img.mimeType, name: img.name });
+        return false;
+      }
+      
+      // Check data size (Gemini has limits - roughly 4MB per image)
+      const estimatedSize = (img.data.length * 3) / 4; // approximate base64 to bytes
+      if (estimatedSize > 4 * 1024 * 1024) {
+        console.warn('[Chat] Filtered out image that is too large:', { 
+          mimeType: img.mimeType, 
+          name: img.name, 
+          estimatedSize: `${(estimatedSize / 1024 / 1024).toFixed(2)}MB` 
+        });
+        return false;
+      }
+      
+      return true;
     });
+
+    if (capturedImages.length > 0 && validImages.length === 0) {
+      console.error('[Chat] All images were filtered out. Original count:', capturedImages.length);
+    }
 
     // Store display text only — base64 is never persisted
     await saveMessage(sessionId, 'user', userContent, validImages.length ? validImages : null);
