@@ -579,13 +579,28 @@ export default function Chat({ username, firstName, lastName, onLogout }) {
 
     if (imageFiles.length > 0) {
       const newImages = await Promise.all(
-        imageFiles.map(async (f) => ({
-          data: await fileToBase64(f),
-          mimeType: f.type,
-          name: f.name,
-        }))
+        imageFiles.map(async (f) => {
+          try {
+            const data = await fileToBase64(f);
+            if (!data || data.trim() === '') {
+              console.error('[File Upload] Failed to read image file:', f.name);
+              return null;
+            }
+            return {
+              data,
+              mimeType: f.type || 'image/png', // fallback to png if type is missing
+              name: f.name,
+            };
+          } catch (err) {
+            console.error('[File Upload] Error reading image file:', f.name, err);
+            return null;
+          }
+        })
       );
-      setImages((prev) => [...prev, ...newImages]);
+      const validNewImages = newImages.filter(Boolean);
+      if (validNewImages.length > 0) {
+        setImages((prev) => [...prev, ...validNewImages]);
+      }
     }
   };
 
@@ -649,13 +664,28 @@ export default function Chat({ username, firstName, lastName, onLogout }) {
     }
     if (imageFiles.length > 0) {
       const newImages = await Promise.all(
-        imageFiles.map(async (f) => ({
-          data: await fileToBase64(f),
-          mimeType: f.type,
-          name: f.name,
-        }))
+        imageFiles.map(async (f) => {
+          try {
+            const data = await fileToBase64(f);
+            if (!data || data.trim() === '') {
+              console.error('[File Upload] Failed to read image file:', f.name);
+              return null;
+            }
+            return {
+              data,
+              mimeType: f.type || 'image/png', // fallback to png if type is missing
+              name: f.name,
+            };
+          } catch (err) {
+            console.error('[File Upload] Error reading image file:', f.name, err);
+            return null;
+          }
+        })
       );
-      setImages((prev) => [...prev, ...newImages]);
+      const validNewImages = newImages.filter(Boolean);
+      if (validNewImages.length > 0) {
+        setImages((prev) => [...prev, ...validNewImages]);
+      }
     }
   };
 
